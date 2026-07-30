@@ -2345,7 +2345,7 @@ var EMOWORDS=[{e:'😊',t:'开心'},{e:'🥰',t:'喜悦'},{e:'😌',t:'平静'},
 VIEWS.growth=function(){
   var tabs=[['vision','🌟 愿景板'],['miracle','✨ 奇迹日志'],['emotion','💗 情绪能量'],['achieve','🏆 成就墙'],['gratitude','🙏 感恩'],['inspire','💡 灵感本'],['student','🌱 学员成长'],['report','🌈 周报']];
   var html='<div class="subtabs" style="flex-wrap:wrap">';
-  tabs.forEach(function(t){html+='<button class="'+(Growth.tab===t[0]?'on':'')+'" onclick="Growth.tab=\''+t[0]+'\';rerender()">'+t[1]+'</button>'});
+  tabs.forEach(function(t){html+='<button class="'+(Growth.tab===t[0]?'on':'')+'" onclick="Growth.tab=\''+t[0]+'\';'+(t[0]==='emotion'?'Growth.emoDate=TODAY();':'')+'rerender()">'+t[1]+'</button>'});
   html+='</div>';
   var f={'vision':Growth.visionHTML,'miracle':Growth.miracleHTML,'emotion':Growth.emotionHTML,'achieve':Growth.achieveHTML,'gratitude':Growth.gratitudeHTML,'inspire':Growth.inspireHTML,'student':Growth.studentHTML,'report':Growth.reportHTML}[Growth.tab];
   html+=f();
@@ -2396,25 +2396,30 @@ Growth.delMiracle=function(k,i){DB.miracle[k].splice(i,1);if(!DB.miracle[k].leng
 
 /* ---- 情绪能量日记 ---- */
 Growth.emotionHTML=function(){
-  var d=TODAY(),r=DB.emotion[d]||{};
-  var html='<div class="card"><div class="h2">💗 今日情绪能量</div>'+
+  var ed=Growth.emoDate||TODAY(), r=DB.emotion[ed]||{}, isToday=(ed===TODAY());
+  var html='<div class="card"><div class="h2">💗 情绪能量日记</div>'+
+    '<div class="row" style="margin:4px 0 10px"><label class="fl" style="margin:0 8px 0 0">日期</label>'+
+    '<input class="input" id="emDate" type="date" value="'+ed+'" max="'+TODAY()+'" onchange="Growth.setEmoDate(this.value)"></div>'+
     '<label class="fl">此刻的情绪</label><div id="emRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
   EMOWORDS.forEach(function(w){html+='<button class="chip'+(r.mood===w.e?' on':'')+'" data-e="'+w.e+'" onclick="Growth.pickEmo(this)">'+w.e+' '+w.t+'</button>'});
   html+='</div>'+
-    '<label class="fl">能量值（1-10）</label><input class="input" id="emEnergy" type="number" min="1" max="10" value="'+(r.energy||'')+'" placeholder="今天状态几分？">'+
+    '<label class="fl">能量值（1-10）</label><input class="input" id="emEnergy" type="number" min="1" max="10" value="'+(r.energy||'')+'" placeholder="状态几分？">'+
     '<label class="fl">触发事件（一句话，选填）</label><input class="input" id="emTrig" placeholder="如：学员说跟我练有变化" value="'+esc(r.trig||'')+'">'+
-    '<button class="btn btn-p btn-full mt12" onclick="Growth.saveEmo()">保存今日情绪能量</button></div>';
+    '<button class="btn btn-p btn-full mt12" onclick="Growth.saveEmo()">保存'+(isToday?'今日':'当日')+'情绪能量</button>'+
+    (isToday?'':'<div class="muted mt8">补记过往日期也可以哦，数据会落到对应那一天 ♡</div>')+'</div>';
   html+='<div class="card"><div class="h2">📈 近14天能量走势</div>';
-  var items=[];for(var i=13;i>=0;i--){var dd=addD(d,-i);var e=(DB.emotion[dd]||{}).energy;items.push({l:(P(dd).getMonth()+1)+'/'+P(dd).getDate(),v:e||null})}
+  var items=[];for(var i=13;i>=0;i--){var dd=addD(TODAY(),-i);var e=(DB.emotion[dd]||{}).energy;items.push({l:(P(dd).getMonth()+1)+'/'+P(dd).getDate(),v:e||null})}
   html+=lineChart(items,{c:'#F5A8BC'})+'</div>';
   return html;
 };
+Growth.setEmoDate=function(v){ if(v)Growth.emoDate=v; rerender(); };
 Growth.pickEmo=function(el){document.querySelectorAll('#emRow .chip').forEach(function(c){c.classList.remove('on')});el.classList.add('on')};
 Growth.saveEmo=function(){
-  var d=TODAY();var mEl=document.querySelector('#emRow .chip.on');var mood=mEl?mEl.dataset.e:'';
+  var d=Growth.emoDate||TODAY();var mEl=document.querySelector('#emRow .chip.on');var mood=mEl?mEl.dataset.e:'';
   var en=parseInt($('#emEnergy').value);if(!en||en<1||en>10){toast('填一下能量值(1-10)');return}
   DB.emotion[d]={mood:mood,energy:en,trig:$('#emTrig').value.trim()};
-  save();rerender();toast('💗 已记录，看见自己的情绪很棒');
+  save();rerender();
+  toast(d===TODAY()?'💗 已记录，看见自己的情绪很棒':'💗 已补记 '+dispD(d)+' 的情绪');
 };
 
 /* ---- 成就墙 ---- */
