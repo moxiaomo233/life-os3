@@ -1852,22 +1852,7 @@ function timeWorkCats(date){
   var m={};(DB.time.log[date]||[]).forEach(function(e){if(e.group==='work')m[e.cat]=(m[e.cat]||0)+(+e.hrs||0)});
   return m;
 }
-/* 从时间管理读取「由每日复盘同步」的条目，回填到复盘表单 */
-function timeReviewEntries(d){
-  var o={coach:0,live:0,sleep:0,other:0,fun:0};
-  (DB.time.log[d]||[]).forEach(function(e){
-    if(e.src!=='review')return;
-    if(e.cat==='健身教练')o.coach=+e.hrs||0;
-    else if(e.cat==='直播')o.live=+e.hrs||0;
-    else if(e.cat==='睡觉')o.sleep=+e.hrs||0;
-    else if(e.cat==='其他工作')o.other=+e.hrs||0;
-    else if(e.cat==='娱乐')o.fun=+e.hrs||0;
-  });
-  return o;
-}
-function timeField(id,label,val){
-  return '<div style="margin-bottom:8px"><label class="fl">'+label+'</label><input class="input" id="'+id+'" type="number" step="0.5" placeholder="如 2" value="'+val+'"></div>';
-}
+/* 时间汇总：跨多日聚合四大类时长（用于复盘展示，时间本身在时间管理页记录） */
 
 VIEWS.review=function(){
   var html='<div class="subtabs">'+
@@ -1905,16 +1890,26 @@ Review.dayHTML=function(){
       (twk.length?'<div class="muted" style="padding:0 0 4px">💼 工作：'+twk.map(function(k){return esc(k)+' '+tw[k].toFixed(1)+'h'}).join('、')+'</div>':'')
       :'<div class="muted" style="padding:2px 0 6px">今天还没记录时间哦，<a href="#" onclick="Time.date=Review.dDate;showView(\'time\');return false;" style="color:#D98BA6;text-decoration:underline">去记录 ›</a></div>')+
     '</div>';
-  // 时间登记（填一次即同步到时间管理，那边还能补其他条目）
-  var dt=timeReviewEntries(d);
-  html+='<div class="card"><div class="h2">⏱️ 今日时间登记 <span class="sub">同步到时间管理</span></div>'+
-    '<div class="muted" style="margin-bottom:8px">在此填时间，自动同步到「时间管理」；时间管理页还能手动补其他条目。</div>'+
-    timeField('tf_coach','💪 教练工作（小时）',dt.coach)+
-    timeField('tf_live','📺 直播（小时）',dt.live)+
-    timeField('tf_sleep','😴 睡觉（小时）',dt.sleep)+
-    timeField('tf_other','💼 其他工作（小时）',dt.other)+
-    timeField('tf_fun','🎮 娱乐休闲（小时）',dt.fun)+
-    '<button class="btn btn-p btn-full mt8" onclick="Review.saveTime(\''+d+'\')">保存时间并同步 ›</button></div>';
+  // 心情（可补记任意过往日期）
+  var curMood=DB.mood[d]||'';
+  var moodChips=MOOD_GOOD.concat(MOOD_BAD).map(function(e){
+    return '<button class="chip'+(curMood===e?' on':'')+'" onclick="Review.setMood(\''+d+'\',\''+e+'\')">'+e+'</button>';
+  }).join('');
+  html+='<div class="card"><div class="h2">😊 今日心情 <span class="sub">可补记过往</span></div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">'+moodChips+'</div>'+
+    (curMood?'<div class="muted">已记下 '+dispD(d)+' 的心情：'+curMood+'</div>':
+      '<div class="muted">选一个表情记录'+(d===TODAY()?'今天':dispD(d))+'的心情，昨天忘了也能补 ♡</div>')+'</div>';
+  // 喝水（与习惯联动，可补记任意过往日期）
+  var wv=waterOf(d),wg=DB.settings.waterGoal;
+  html+='<div class="card"><div class="h2">💧 喝水量 <span class="sub">可补记 · 与习惯打卡联动</span></div>'+
+    '<div class="row"><b class="grow">'+wv+' / '+wg+' ml</b>'+
+    '<button class="btn btn-sm" onclick="addWater(250,\''+d+'\')">+250</button>'+
+    '<button class="btn btn-sm" onclick="addWater(500,\''+d+'\')">+500</button></div>'+
+    '<div class="prog mt8"><i style="width:'+Math.min(100,wv/wg*100)+'%"></i></div></div>';
+  // 时间：作为二级页面，直接跳到时间管理记录（不再重复填+同步）
+  html+='<div class="card"><div class="h2">⏱️ 时间记录 <span class="sub">二级页面</span></div>'+
+    '<div class="muted" style="margin-bottom:8px">点下面按钮直接到「时间管理 · 每日记录」里记'+(d===TODAY()?'今天':dispD(d))+'的时间，记完自动回显在这里，不用再同步。</div>'+
+    '<button class="btn btn-p btn-full" onclick="Time.date=\''+d+'\';showView(\'time\')">⏱️ 去记录'+(d===TODAY()?'今日':'当日')+'时间 ›</button></div>';
   html+='<div class="card"><div class="h2">🙏 今天做得好的3件事（感恩日记）</div>';
   for(var i=0;i<3;i++){
     html+='<input class="input" style="margin-bottom:8px" placeholder="第'+(i+1)+'件…" value="'+esc(r.good[i]||'')+'" onchange="Review.setD(\''+d+'\',\'good\',this.value,'+i+')">';
@@ -1933,22 +1928,10 @@ Review.setD=function(d,k,v,i){
   if(k==='good')r.good[i]=v;else r[k]=v;
   save();toast('已保存 ✓');
 };
-Review.saveTime=function(d){
-  var map=[
-    {id:'tf_coach',cat:'健身教练',group:'work'},
-    {id:'tf_live',cat:'直播',group:'work'},
-    {id:'tf_sleep',cat:'睡觉',group:'life'},
-    {id:'tf_other',cat:'其他工作',group:'work'},
-    {id:'tf_fun',cat:'娱乐',group:'leisure'}
-  ];
-  if(!DB.time.log[d])DB.time.log[d]=[];
-  DB.time.log[d]=DB.time.log[d].filter(function(e){return e.src!=='review'});
-  map.forEach(function(m){
-    var v=parseFloat($('#'+m.id).value);
-    if(v>0)DB.time.log[d].push({id:uid(),cat:m.cat,group:m.group,hrs:v,src:'review'});
-  });
-  if(!DB.time.log[d].length)delete DB.time.log[d];
-  save();rerender();toast('⏱️ 时间已同步到时间管理');
+Review.setMood=function(d,e){
+  if(DB.mood[d]===e)delete DB.mood[d];
+  else DB.mood[d]=e;
+  save();rerender();
 };
 Review.toPlan=function(d){
   var r=rvD(d),tm=addD(d,1);
