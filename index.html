@@ -258,7 +258,7 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
     <button onclick="closeMore();showView('time')"><span>⏱️</span>时间管理</button>
     <button onclick="closeMore();showView('review')"><span>🌙</span>复盘管理</button>
     <button onclick="closeMore();showView('growth')"><span>💫</span>成长显化</button>
-    <button onclick="closeMore();OneStop.date=TODAY();showView('onestop')"><span>🌟</span>今日一站式</button>
+    <button onclick="closeMore();OneStop.date=TODAY();showView('onestop')"><span>✨</span>今日速记</button>
   </div>
   <div class="sheet-row">
     <button class="btn" onclick="exportData()">💾 导出备份</button>
@@ -540,7 +540,7 @@ function loadFix(){var t=DB;DB=t;var d=defaults();for(var k in d){if(DB[k]===und
 /* ================= 视图路由 ================= */
 var S={view:'home'};
 var VIEWS={};
-var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',content:'📱 内容创作',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化',onestop:'🌟 今日一站式'};
+var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',content:'📱 内容创作',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化',onestop:'✨ 今日速记'};
 function showView(v,opt){
   S.view=v;
   $('#topTitle').textContent=TITLES[v]||'🌷 显化人生';
@@ -767,7 +767,7 @@ VIEWS.home=function(){
   html+='</div><div class="muted mt8">喝完一杯点一下（每杯250ml）'+(water>=goal?' · 🎉 目标达成！':'')+'</div></div>';
 
   // 记录今天 + 记录时间（并排快捷入口，不藏进更多）
-  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">🌟 今日一站式 · 一次填完</button>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">✨ 今日速记 · 一次填完</button>';
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Growth.tab=\'vision\';showView(\'growth\')">💫 成长显化 · 愿景/奇迹/情绪/成就/感恩</button>';
 
   // 快捷入口
@@ -796,7 +796,7 @@ Dash.setMood=function(e){
   toast(e+' '+ (nice[e]||'已记录'));
 };
 
-/* ================= 今日一站式（集中录入） ================= */
+/* ================= 今日速记（集中录入） ================= */
 var OneStop={date:TODAY()};
 VIEWS.onestop=function(){
   var d=OneStop.date;
@@ -828,7 +828,7 @@ VIEWS.onestop=function(){
   html+='<div class="grid2" style="gap:8px">'+
     '<button class="btn" onclick="Time.date=\''+d+'\';showView(\'time\')">⏱️ 更多时间 ›</button>'+
     '<button class="btn" onclick="Review.dDate=\''+d+'\';Review.tab=\'d\';showView(\'review\')">🙏 感恩/复盘 ›</button></div>';
-  return html;
+  $('#view').innerHTML=html;
 };
 
 </script>
@@ -1698,6 +1698,18 @@ Body.weekHTML=function(){
     '</div>'+
     '<label class="fl">运动总时长（分钟）</label><div class="auto-box">'+exMin+' 分钟 · 自动统计（时间管理·运动健身）</div>'+
     '<label class="fl">身体状态备注</label><textarea class="ta" onchange="Body.setW(\''+ws+'\',\'note\',this.value)">'+esc(w.note||'')+'</textarea></div>';
+  // 本周睡眠 & 大便总结（自动汇总自每日记录）
+  var wDays=weekDays(ws);
+  var sDays=wDays.filter(function(d){return sleepOf(d).h!=null});
+  var avgSleep=sDays.length?Math.round(sum(sDays.map(function(d){return sleepOf(d).h}))/sDays.length*10)/10:null;
+  var qc={好:0,一般:0,差:0};
+  sDays.forEach(function(d){var q=sleepOf(d).q;if(q)qc[q]++});
+  var bq=sum(wDays.map(function(d){return (+((DB.body.day[d]||{}).bowel||0))}));
+  var bwAvg=Math.round(bq/7*10)/10;
+  html+='<div class="card"><div class="h2">💤 本周睡眠 & 🚽 大便总结 <span class="sub">自动汇总自每日记录</span></div>'+
+    '<div class="auto-box">😴 平均睡眠 <b>'+(avgSleep!=null?avgSleep+' 小时':'—')+'</b>'+(sDays.length?(' · 本周 '+sDays.length+' 天有记录 · 质量 好'+qc['好']+'/一般'+qc['一般']+'/差'+qc['差']):' · 本周还没记睡眠')+'</div>'+
+    '<div class="auto-box mt8">🚽 大便 <b>'+bq+' 次</b> · 日均 '+bwAvg+' 次</div>'+
+    '<div class="muted mt8">数据来自「每日记录」里的睡眠/大便，填了这里会自动更新～</div></div>';
   // 本周运动打卡回顾（联动习惯）
   html+='<div class="card"><div class="h2">🏋️ 本周运动打卡（联动习惯）</div>';
   if(wods.length){
@@ -1727,13 +1739,25 @@ Body.trendHTML=function(){
   html+='<div class="card"><div class="h2">📉 体脂率变化（%）</div>'+lineChart(fItems,{c:'#F5A8BC'})+'</div>';
   // 本周睡眠
   var wk=weekDays(TODAY());
+  var wkS=wk.filter(function(d){return sleepOf(d).h!=null});
+  var wkAvg=wkS.length?Math.round(sum(wkS.map(function(d){return sleepOf(d).h}))/wkS.length*10)/10:null;
   var sItems=wk.map(function(d){var s=sleepOf(d);return {l:'周'+DOW[P(d).getDay()],v:s.h||0}});
-  html+='<div class="card"><div class="h2">😴 本周睡眠时长（小时）</div>'+barChart(sItems,{c1:'#93B8E8',showVal:true})+'<div class="mt8">';
+  html+='<div class="card"><div class="h2">😴 本周睡眠时长（小时）</div>'+
+    (wkAvg!=null?'<div class="auto-box">本周平均 <b>'+wkAvg+' 小时</b> · '+wkS.length+' 天有记录</div>':'<div class="muted">本周还没记录睡眠，去「每日记录」填一下吧～</div>')+
+    barChart(sItems,{c1:'#93B8E8',showVal:true})+'<div class="mt8">';
   wk.forEach(function(d){
     var s=sleepOf(d);
     if(s.q)html+='<span class="chip">'+'周'+DOW[P(d).getDay()]+' '+(s.q==='好'?'😊':s.q==='一般'?'😐':'😫')+'</span>';
   });
   html+='</div></div>';
+  // 每周平均睡眠趋势（近3个月，自动汇总自每日记录）
+  var sleepTrend=weeks.map(function(ws){
+    var wd=weekDays(ws);
+    var sd=wd.filter(function(d){return sleepOf(d).h!=null});
+    var avg=sd.length?Math.round(sum(sd.map(function(d){return sleepOf(d).h}))/sd.length*10)/10:null;
+    return {l:(P(ws).getMonth()+1)+'/'+P(ws).getDate(), v:avg};
+  });
+  html+='<div class="card"><div class="h2">😴 每周平均睡眠（小时 · 近3个月）</div>'+lineChart(sleepTrend,{c:'#93B8E8'})+'<div class="muted mt8">哪周睡得好、哪周缺觉，一眼看清～</div></div>';
   return html;
 };
 
