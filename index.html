@@ -212,6 +212,13 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
 .summary-line span:last-child{font-weight:600}
 .auto-box{background:#F3F0F8;border:1px solid #E6DEF4;border-radius:10px;padding:10px 12px;font-size:.92rem;font-weight:600;color:var(--purple);margin:4px 0}
 .auto-box .muted{font-weight:400}
+.sup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.sup-card{background:var(--purple-xl);border:1px solid #EADCF1;border-radius:12px;padding:11px 4px;text-align:center;font-size:.82rem;font-weight:600;color:var(--purple);cursor:pointer;font-family:inherit;line-height:1.2}
+.sup-card.on{background:linear-gradient(120deg,var(--pink),var(--purple));color:#fff;border-color:transparent}
+.sup-card .st{display:block;font-size:1.05rem;margin-top:3px}
+.sup-sum{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sup-sum .pill{background:var(--purple-xl);border-radius:20px;padding:6px 12px;font-size:.78rem;color:var(--purple)}
+.sup-sum .pill b{color:var(--purple);margin:0 3px}
 .warn-banner{background:#FFF0F1;color:var(--red);border-radius:12px;padding:9px 12px;font-size:.78rem;margin-bottom:10px}
 .pri-高{color:var(--red);font-weight:700}
 .pri-中{color:var(--gold)}
@@ -1544,6 +1551,9 @@ Money.trendHTML=function(){
 /* ================= 身体管理 ================= */
 var Body={date:TODAY(),tab:'day'};
 
+/* 补剂清单（身体专属，每日勾选，周/月自动汇总次数） */
+var SUPPS=['钙片','维C','维E','维B','鱼油','镁','肌酸','BCCA','蛋白粉'];
+
 function bday(date){
   if(!DB.body.day[date])DB.body.day[date]={meds:[],sleep:{},bowel:0};
   return DB.body.day[date];
@@ -1609,12 +1619,13 @@ Body.dayHTML=function(){
     '<div class="row"><b class="grow">'+water+' / '+goal+' ml</b></div>'+
     '<div class="prog mt8"><i style="width:'+Math.min(100,water/goal*100)+'%"></i></div>'+
     (water>=goal?'<div class="muted mt8">🎉 今日目标已达成</div>':'<div class="muted mt8">还没达标，去「记录今天」补喝几杯吧～</div>')+'</div>';
-  // 吃药
-  html+='<div class="card"><div class="h2">💊 吃药/补剂记录</div>';
-  (bd.meds||[]).forEach(function(m,i){
-    html+='<div class="li"><div class="ck '+(m.on?'on':'')+'" onclick="Body.toggleMed(\''+d+'\','+i+')">✓</div><div class="grow name'+(m.on?' muted':'')+'">'+esc(m.n)+'</div><button class="del-x" onclick="Body.delMed(\''+d+'\','+i+')">✕</button></div>';
+  // 补剂打卡（身体专属，每日勾选）
+  var sp=(DB.body.day[d]||{}).sup||{};
+  html+='<div class="card"><div class="h2">💊 补剂打卡 <span class="sub">今天吃了哪些？</span></div><div class="sup-grid">';
+  SUPPS.forEach(function(s){
+    html+='<button class="sup-card'+(sp[s]?' on':'')+'" onclick="Body.toggleSup(\''+d+'\',\''+s+'\')">'+s+'<span class="st">'+(sp[s]?'✓':'＋')+'</span></button>';
   });
-  html+='<div class="row mt8"><input class="input grow" id="medInp" placeholder="药品/补剂名称，如：维生素C"><button class="btn btn-p" onclick="Body.addMed(\''+d+'\')">添加</button></div></div>';
+  html+='</div><div class="muted mt8">点一下勾选「今天吃了」，周/月会自动汇总次数～</div></div>';
   // 睡眠（只读，来自记录今天）
   var s=bd.sleep||{};
   html+='<div class="card"><div class="h2">😴 睡眠记录 <span class="sub">来自「记录今天」</span></div>';
@@ -1650,12 +1661,31 @@ Body.dayHTML=function(){
   html+='<div class="row mt12"><button class="btn grow" onclick="Body.addPeriod()">＋ 记录一次经期</button>'+(DB.body.period.length?'<button class="btn" onclick="Body.listPeriod()">历史</button>':'')+'</div></div>';
   return html;
 };
-Body.addMed=function(d){
-  var v=$('#medInp').value.trim();if(!v)return;
-  bday(d).meds.push({n:v,on:true});save();rerender();
+Body.toggleSup=function(d,name){
+  var x=bday(d);
+  if(!x.sup)x.sup={};
+  x.sup[name]=!x.sup[name];
+  save();rerender();
 };
-Body.toggleMed=function(d,i){var m=bday(d).meds[i];m.on=!m.on;save();rerender()};
-Body.delMed=function(d,i){bday(d).meds.splice(i,1);save();rerender()};
+// 统计若干天里每种补剂被勾选的天数
+Body.supCount=function(days){
+  var cnt={};
+  SUPPS.forEach(function(s){cnt[s]=0});
+  days.forEach(function(d){
+    var sp=(DB.body.day[d]||{}).sup||{};
+    SUPPS.forEach(function(s){if(sp[s])cnt[s]++});
+  });
+  return cnt;
+};
+Body.supCardHTML=function(title,days){
+  var cnt=Body.supCount(days);
+  var html='<div class="card"><div class="h2">'+title+'</div><div class="sup-sum">';
+  SUPPS.forEach(function(s){
+    html+='<span class="pill">'+s+' <b>'+cnt[s]+'</b> 次</span>';
+  });
+  html+='</div></div>';
+  return html;
+};
 Body.setSleep=function(d,k,v){
   var s=bday(d);if(!s.sleep)s.sleep={};
   s.sleep[k]=v;save();rerender();
@@ -1710,6 +1740,11 @@ Body.weekHTML=function(){
     '<div class="auto-box">😴 平均睡眠 <b>'+(avgSleep!=null?avgSleep+' 小时':'—')+'</b>'+(sDays.length?(' · 本周 '+sDays.length+' 天有记录 · 质量 好'+qc['好']+'/一般'+qc['一般']+'/差'+qc['差']):' · 本周还没记睡眠')+'</div>'+
     '<div class="auto-box mt8">🚽 大便 <b>'+bq+' 次</b> · 日均 '+bwAvg+' 次</div>'+
     '<div class="muted mt8">数据来自「每日记录」里的睡眠/大便，填了这里会自动更新～</div></div>';
+  // 本周/本月补剂打卡汇总（自动统计自每日勾选）
+  var mk=TODAY().slice(0,7);
+  var mDays=weekDays? monthDays(mk):[];
+  html+=Body.supCardHTML('💊 本周补剂打卡（自动统计）',wDays);
+  html+=Body.supCardHTML('💊 本月补剂打卡（'+mk+' · 自动统计）',mDays);
   // 本周运动打卡回顾（联动习惯）
   html+='<div class="card"><div class="h2">🏋️ 本周运动打卡（联动习惯）</div>';
   if(wods.length){
