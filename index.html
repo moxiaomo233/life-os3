@@ -1433,10 +1433,10 @@ Money.ovHTML=function(){
     '<div class="row mt12"><div class="ck '+(paid?'on':'')+'" onclick="Money.togglePaid(\''+mk+'\')">✓</div><span>'+(paid?'✅ 本月已还清，好棒！':'本月还未还款')+'</span>'+
     '<button class="btn btn-sm" style="margin-left:auto" onclick="Money.editPay()">设置</button></div></div>';
   var dp=M.debtStart?repaid/M.debtStart*100:0;
-  html+='<div class="card"><div class="h2">🌈 总债务进度 <button class="btn btn-sm" onclick="Money.editDebt()">更新</button></div>'+
-    '<div class="summary-line"><span>起始债务</span><span>'+fm(M.debtStart)+' 元</span></div>'+
+  html+='<div class="card"><div class="h2">🌈 总债务进度</div>'+
+    '<div class="summary-line"><span>起始债务 <button class="btn btn-sm" onclick="Money.editDebtStart()">编辑</button></span><span>'+fm(M.debtStart)+' 元</span></div>'+
     '<div class="summary-line"><span>已还</span><span class="red">'+fm(repaid)+' 元</span></div>'+
-    '<div class="summary-line"><span>剩余欠款</span><span>'+fm(M.debtLeft)+' 元</span></div>'+
+    '<div class="summary-line"><span>剩余欠款 <button class="btn btn-sm" onclick="Money.editDebt()">改</button></span><span>'+fm(M.debtLeft)+' 元</span></div>'+
     '<div class="prog green mt8"><i style="width:'+dp+'%"></i></div>'+
     '<div class="muted mt8">已还 '+dp.toFixed(1)+'% · 每一笔都在靠近自由 💪</div>'+
     '<button class="btn btn-full mt8" onclick="Money.payOne(\''+mk+'\')">✓ 记一笔月还款（-'+fm(M.monthlyPay)+'）</button></div>';
@@ -1457,6 +1457,11 @@ Money.editPay=function(){
 Money.editDebt=function(){
   var v=prompt('当前剩余欠款（元）',DB.money.debtLeft);
   if(v!=null&&+v>=0){DB.money.debtLeft=+v;save();rerender()}
+};
+Money.editDebtStart=function(){
+  var old=DB.money.debtStart;
+  var v=prompt('设置起始债务金额（元）\n设置后若你还没记过还款，剩余欠款会同步更新为相同金额',old);
+  if(v!=null&&+v>=0){v=+v;DB.money.debtStart=v;if(DB.money.debtLeft===old)DB.money.debtLeft=v;save();rerender();toast('🌈 已更新起始债务')}
 };
 Money.payOne=function(mk){
   if(!confirm('记录一笔月还款 '+fm(DB.money.monthlyPay)+' 元？剩余欠款将减少。'))return;
