@@ -751,9 +751,9 @@ VIEWS.home=function(){
     }).join('')+'</div></div></div>';
 
   // 两个主入口：记录今天 / 感恩复盘
-  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">📝 记录今天 · 心情/睡眠/喝水/拉屎/时间</button>';
-  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Review.dDate=TODAY();Review.tab=\'d\';showView(\'review\')">🌙 感恩复盘 · 感恩/最满意/显化/意图</button>';
-  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Growth.tab=\'vision\';showView(\'growth\')">💫 成长显化 · 愿景/奇迹/情绪/成就/感恩</button>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">📝 记录今天</button>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Review.dDate=TODAY();Review.tab=\'d\';showView(\'review\')">🌙 感恩复盘</button>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Growth.tab=\'vision\';showView(\'growth\')">💫 成长显化</button>';
 
   // 快捷入口
   html+='<div class="card"><div class="grid2" style="gap:8px">'+
@@ -1948,7 +1948,6 @@ Review.dayHTML=function(){
   var d=Review.dDate,r=rvD(d);
   var hp=habitProgress(d),pp=planProgress(d),m=dayMoney(d);
   var sMin=studyMins([d]),sList=studyOf(d);
-  var ta=timeAgg([d]),tw=timeWorkCats(d),twk=Object.keys(tw);
   var sl=sleepOf(d),mood=DB.mood[d]||'—';
   var posts=DB.content.filter(function(c){return c.date===d});
   var html='<div class="datebar"><button onclick="Review.dDate=addD(Review.dDate,-1);rerender()">‹</button><b>'+dispD(d)+(d===TODAY()?' · 今天':'')+'</b><button onclick="Review.dDate=addD(Review.dDate,1);rerender()">›</button></div>';
@@ -1964,16 +1963,7 @@ Review.dayHTML=function(){
     '<div class="summary-line"><span>心情</span><span style="font-size:1.1rem">'+mood+'</span></div>'+
     '<div class="summary-line"><span>📱 发布内容</span><span>'+(posts.length?posts.length+' 条':'—')+'</span></div>'+
     (posts.length?'<div class="muted" style="padding:2px 0">'+posts.map(function(c){return esc(c.platform)+'《'+esc(c.title)+'》'}).join('、')+'</div>':'')+
-    '<div class="summary-line"><span>⏱️ 今日时间</span><span>'+(ta.total?ta.total.toFixed(1)+' 小时':'—')+'</span></div>'+
-    (ta.total?
-      '<div class="muted" style="padding:2px 0 6px">工作 '+ta.g.work.toFixed(1)+'h · 生活 '+ta.g.life.toFixed(1)+'h · 成长 '+ta.g.growth.toFixed(1)+'h · 休闲 '+ta.g.leisure.toFixed(1)+'h</div>'+
-      (twk.length?'<div class="muted" style="padding:0 0 4px">💼 工作：'+twk.map(function(k){return esc(k)+' '+tw[k].toFixed(1)+'h'}).join('、')+'</div>':'')
-      :'<div class="muted" style="padding:2px 0 6px">今天还没记录时间哦，<a href="#" onclick="Time.date=Review.dDate;showView(\'time\');return false;" style="color:#D98BA6;text-decoration:underline">去记录 ›</a></div>')+
     '</div>';
-  // 时间：作为二级页面，直接跳到时间管理记录（不再重复填+同步）
-  html+='<div class="card"><div class="h2">⏱️ 时间记录 <span class="sub">二级页面</span></div>'+
-    '<div class="muted" style="margin-bottom:8px">点下面按钮直接到「时间管理 · 每日记录」里记'+(d===TODAY()?'今天':dispD(d))+'的时间，记完自动回显在这里，不用再同步。</div>'+
-    '<button class="btn btn-p btn-full" onclick="Time.date=\''+d+'\';showView(\'time\')">⏱️ 去记录'+(d===TODAY()?'今日':'当日')+'时间 ›</button></div>';
   html+='<div class="card"><div class="h2">🙏 今天做得好的3件事（感恩日记）</div>';
   for(var i=0;i<3;i++){
     html+='<input class="input" style="margin-bottom:8px" placeholder="第'+(i+1)+'件…" value="'+esc(r.good[i]||'')+'" onchange="Review.setD(\''+d+'\',\'good\',this.value,'+i+')">';
