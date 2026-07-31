@@ -210,6 +210,8 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
 .summary-line{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #F5E3EA;font-size:.85rem}
 .summary-line:last-child{border-bottom:none}
 .summary-line span:last-child{font-weight:600}
+.auto-box{background:#F3F0F8;border:1px solid #E6DEF4;border-radius:10px;padding:10px 12px;font-size:.92rem;font-weight:600;color:var(--purple);margin:4px 0}
+.auto-box .muted{font-weight:400}
 .warn-banner{background:#FFF0F1;color:var(--red);border-radius:12px;padding:9px 12px;font-size:.78rem;margin-bottom:10px}
 .pri-高{color:var(--red);font-weight:700}
 .pri-中{color:var(--gold)}
@@ -256,6 +258,7 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
     <button onclick="closeMore();showView('time')"><span>⏱️</span>时间管理</button>
     <button onclick="closeMore();showView('review')"><span>🌙</span>复盘管理</button>
     <button onclick="closeMore();showView('growth')"><span>💫</span>成长显化</button>
+    <button onclick="closeMore();OneStop.date=TODAY();showView('onestop')"><span>🌟</span>今日一站式</button>
   </div>
   <div class="sheet-row">
     <button class="btn" onclick="exportData()">💾 导出备份</button>
@@ -428,6 +431,9 @@ var AFFIRMS=[
   '我相信过程，我允许好事在路上，它们一定会来。',
   '我现在很好，以后会更好，我对未来充满期待。'
 ];
+/* 心情互通映射：首页 emoji ↔ 成长「情绪能量日记」emoji */
+var MOOD_TO_EMO={'🌞':'😊','😊':'😊','🥰':'🥰','😐':'😌','😴':'😩','😢':'😢','😡':'😟'};
+var EMO_TO_MOOD={'😊':'😊','🥰':'🥰','😌':'😐','🔥':'😊','😟':'😢','😩':'😴','🎯':'😊','😢':'😢'};
 function defaults(){
   return {
     ver:1,
@@ -499,6 +505,11 @@ function loadDB(){
   for(var k2 in d.money){if(DB.money[k2]===undefined)DB.money[k2]=d.money[k2]}
   for(var k3 in d.plans){if(DB.plans[k3]===undefined)DB.plans[k3]=d.plans[k3]}
   for(var k4 in d.body){if(DB.body[k4]===undefined)DB.body[k4]=d.body[k4]}
+  // 迁移：睡觉改由身体管理同步，清除时间管理里独立的「睡觉」条目
+  if(!DB._mig_sleep){
+    if(DB.time&&DB.time.log)Object.keys(DB.time.log).forEach(function(k){DB.time.log[k]=(DB.time.log[k]||[]).filter(function(e){return e.cat!=='睡觉'})});
+    DB._mig_sleep=true;
+  }
 }
 function save(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB))}catch(e){toast('⚠️ 保存失败：存储空间不足')}}
 
@@ -529,7 +540,7 @@ function loadFix(){var t=DB;DB=t;var d=defaults();for(var k in d){if(DB[k]===und
 /* ================= 视图路由 ================= */
 var S={view:'home'};
 var VIEWS={};
-var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',content:'📱 内容创作',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化'};
+var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',content:'📱 内容创作',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化',onestop:'🌟 今日一站式'};
 function showView(v,opt){
   S.view=v;
   $('#topTitle').textContent=TITLES[v]||'🌷 显化人生';
@@ -728,7 +739,8 @@ VIEWS.home=function(){
 
   // 今日时间分配速览
   var tArr=DB.time.log[d]||[],gt={work:0,life:0,growth:0,leisure:0};
-  tArr.forEach(function(e){gt[e.group]=(gt[e.group]||0)+(+e.hrs||0)});
+  tArr.forEach(function(e){if(e.cat==='睡觉')return;gt[e.group]=(gt[e.group]||0)+(+e.hrs||0)});
+  gt.life+=(sleepOf(d).h||0);
   var GCOL={work:'#F5A8BC',life:'#B79CE0',growth:'#8FCBB4',leisure:'#F2C879'};
   var GTXT={work:'工作',life:'生活',growth:'成长',leisure:'休闲'};
   html+='<div class="card" onclick="showView(\'time\')"><div class="h2">⏱️ 今日时间分配 <span class="sub">点击进入时间管理 ›</span></div>'+
@@ -755,9 +767,7 @@ VIEWS.home=function(){
   html+='</div><div class="muted mt8">喝完一杯点一下（每杯250ml）'+(water>=goal?' · 🎉 目标达成！':'')+'</div></div>';
 
   // 记录今天 + 记录时间（并排快捷入口，不藏进更多）
-  html+='<div class="grid2" style="gap:8px;margin-bottom:12px">'+
-    '<button class="btn btn-p" onclick="Review.tab=\'d\';Review.dDate=TODAY();showView(\'review\')">🌙 记录今天</button>'+
-    '<button class="btn btn-p" onclick="Time.date=TODAY();Time.tab=\'rec\';showView(\'time\')">⏱️ 记录时间</button></div>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">🌟 今日一站式 · 一次填完</button>';
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Growth.tab=\'vision\';showView(\'growth\')">💫 成长显化 · 愿景/奇迹/情绪/成就/感恩</button>';
 
   // 快捷入口
@@ -778,9 +788,47 @@ Dash.nextAffirm=function(){
   Dash.affirmIdx=i;rerender();
 };
 Dash.setMood=function(e){
-  DB.mood[TODAY()]=e;save();rerender();
+  DB.mood[TODAY()]=e;
+  if(!DB.emotion[TODAY()])DB.emotion[TODAY()]={};
+  DB.emotion[TODAY()].mood=MOOD_TO_EMO[e]||e;
+  save();rerender();
   var nice={'🌞':'今天阳光满满！','😊':'保持好心情～','🥰':'被爱包围的一天！','😐':'平平淡淡也是福','😴':'累了就早点休息','😢':'抱抱你，明天会更好','😡':'深呼吸，别让情绪带跑你'};
   toast(e+' '+ (nice[e]||'已记录'));
+};
+
+/* ================= 今日一站式（集中录入） ================= */
+var OneStop={date:TODAY()};
+VIEWS.onestop=function(){
+  var d=OneStop.date;
+  var sl=sleepOf(d),mood=DB.mood[d]||'',wv=waterOf(d),wg=DB.settings.waterGoal;
+  var studyMin=Math.round(sum((DB.time.log[d]||[]).filter(function(e){return e.cat==='学习'}).map(function(e){return (+e.hrs||0)*60})));
+  var exMin=Math.round(sum((DB.time.log[d]||[]).filter(function(e){return e.cat==='运动健身'}).map(function(e){return (+e.hrs||0)*60})));
+  var html='<div class="datebar"><button onclick="OneStop.date=addD(OneStop.date,-1);rerender()">‹</button><b>'+dispD(d)+(d===TODAY()?' · 今天':'')+'</b><button onclick="OneStop.date=addD(OneStop.date,1);rerender()">›</button></div>';
+  // 睡觉
+  html+='<div class="card"><div class="h2">😴 睡眠记录</div><div class="grid2">'+
+    '<div><label class="fl">昨晚几点睡</label><input class="input" type="time" value="'+esc(sl.bed||'')+'" onchange="Body.setSleep(\''+d+'\',\'bed\',this.value)"></div>'+
+    '<div><label class="fl">今早几点起</label><input class="input" type="time" value="'+esc(sl.wake||'')+'" onchange="Body.setSleep(\''+d+'\',\'wake\',this.value)"></div></div>'+
+    (sl.h!=null?'<div class="stat-box mt8"><div class="stat-num purple">'+sl.h+' 小时</div><div class="muted">自动计算睡眠时长</div></div>':'')+'</div>';
+  // 心情
+  var moodChips=MOOD_LIST.map(function(e){return '<button class="chip'+(mood===e?' on':'')+'" onclick="Review.setMood(\''+d+'\',\''+e+'\')">'+e+'</button>'}).join('');
+  html+='<div class="card"><div class="h2">😊 今日心情</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+moodChips+'</div></div>';
+  // 喝水
+  html+='<div class="card"><div class="h2">💧 喝水量</div><div class="row"><b class="grow">'+wv+' / '+wg+' ml</b>'+
+    '<button class="btn btn-sm" onclick="addWater(250,\''+d+'\')">+250</button><button class="btn btn-sm" onclick="addWater(500,\''+d+'\')">+500</button></div>'+
+    '<div class="prog mt8"><i style="width:'+Math.min(100,wv/wg*100)+'%"></i></div></div>';
+  // 学习
+  html+='<div class="card"><div class="h2">📖 学习时长 <span class="sub">写入时间管理·成长</span></div>'+
+    '<div class="row"><input class="input grow" type="number" id="osStudy" placeholder="分钟" value="'+studyMin+'">'+
+    '<button class="btn btn-p" onclick="Time.quickSet(\''+d+'\',\'学习\',\'growth\',document.getElementById(\'osStudy\').value)">保存</button></div></div>';
+  // 运动
+  html+='<div class="card"><div class="h2">🏋️ 运动时长 <span class="sub">写入时间管理·成长</span></div>'+
+    '<div class="row"><input class="input grow" type="number" id="osEx" placeholder="分钟" value="'+exMin+'">'+
+    '<button class="btn btn-p" onclick="Time.quickSet(\''+d+'\',\'运动健身\',\'growth\',document.getElementById(\'osEx\').value)">保存</button></div></div>';
+  // 时间 & 感恩
+  html+='<div class="grid2" style="gap:8px">'+
+    '<button class="btn" onclick="Time.date=\''+d+'\';showView(\'time\')">⏱️ 更多时间 ›</button>'+
+    '<button class="btn" onclick="Review.dDate=\''+d+'\';Review.tab=\'d\';showView(\'review\')">🙏 感恩/复盘 ›</button></div>';
+  return html;
 };
 
 </script>
@@ -1260,7 +1308,7 @@ Study.tarotHTML=function(){
   if(!keys.length)html+='<div class="empty">还没有抽牌记录</div>';
   keys.forEach(function(k){
     var t=DB.tarot[k];
-    html+='<div class="li"><div class="emoji">🔮</div><div class="grow"><div class="name">'+dispD(k)+' · '+esc(t.card||'')+'</div><div class="desc">'+(t.note?esc(t.note):'')+(t.symbol?' · <span class="muted">'+esc(t.symbol)+'</span>':'')+'</div></div></div>';
+    html+='<div class="li"><div class="emoji">🔮</div><div class="grow"><div class="name">'+dispD(k)+' · '+esc(t.card||'')+'</div><div class="desc">'+(t.note?esc(t.note):'')+(t.symbol?' · <span class="muted">'+esc(t.symbol)+'</span>':'')+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentTarot(\''+k+'\')">📱转内容</button></div>';
   });
   html+='</div>';
   return html;
@@ -1638,17 +1686,19 @@ Body.weekSel=TODAY();
 Body.weekHTML=function(){
   var ws=weekStart(Body.weekSel),w=DB.body.week[ws]||{};
   var html='<div class="datebar"><button onclick="Body.weekSel=addD(Body.weekSel,-7);rerender()">‹</button><b>'+dispD(ws)+' 这一周</b><button onclick="Body.weekSel=addD(Body.weekSel,7);rerender()">›</button></div>';
+  var _wd=weekDays(ws);
+  var wods=_wd.filter(function(d){return habitDone(DB.habits.find(function(h){return h.id==='workout'})||{},hrec(d,'workout'))});
+  var exMin=Math.round(sum(_wd.map(function(d){return sum((DB.time.log[d]||[]).filter(function(e){return e.cat==='运动健身'}).map(function(e){return (+e.hrs||0)*60}))})));
   html+='<div class="card"><div class="h2">📏 本周身体数据 <span class="sub">每周记一次就好</span></div>'+
     '<div class="grid2">'+
     '<div><label class="fl">体重（kg）</label><input class="input" type="number" step="0.1" value="'+(w.weight||'')+'" onchange="Body.setW(\''+ws+'\',\'weight\',this.value)"></div>'+
     '<div><label class="fl">体脂率（%）</label><input class="input" type="number" step="0.1" value="'+(w.fat||'')+'" onchange="Body.setW(\''+ws+'\',\'fat\',this.value)"></div>'+
     '<div><label class="fl">腰围（cm，选填）</label><input class="input" type="number" step="0.1" value="'+(w.waist||'')+'" onchange="Body.setW(\''+ws+'\',\'waist\',this.value)"></div>'+
-    '<div><label class="fl">运动次数</label><input class="input" type="number" value="'+(w.times||'')+'" onchange="Body.setW(\''+ws+'\',\'times\',this.value)"></div>'+
+    '<div><label class="fl">运动次数</label><div class="auto-box">'+wods.length+' 次 · 自动统计（运动打卡天数）</div></div>'+
     '</div>'+
-    '<label class="fl">运动总时长（分钟）</label><input class="input" type="number" value="'+(w.mins||'')+'" onchange="Body.setW(\''+ws+'\',\'mins\',this.value)">'+
+    '<label class="fl">运动总时长（分钟）</label><div class="auto-box">'+exMin+' 分钟 · 自动统计（时间管理·运动健身）</div>'+
     '<label class="fl">身体状态备注</label><textarea class="ta" onchange="Body.setW(\''+ws+'\',\'note\',this.value)">'+esc(w.note||'')+'</textarea></div>';
   // 本周运动打卡回顾（联动习惯）
-  var wods=weekDays(ws).filter(function(d){return habitDone(DB.habits.find(function(h){return h.id==='workout'})||{},hrec(d,'workout'))});
   html+='<div class="card"><div class="h2">🏋️ 本周运动打卡（联动习惯）</div>';
   if(wods.length){
     wods.forEach(function(d){
@@ -1936,6 +1986,8 @@ Review.setD=function(d,k,v,i){
 Review.setMood=function(d,e){
   if(DB.mood[d]===e)delete DB.mood[d];
   else DB.mood[d]=e;
+  if(!DB.emotion[d])DB.emotion[d]={};
+  DB.emotion[d].mood=MOOD_TO_EMO[e]||e;
   save();rerender();
 };
 Review.toPlan=function(d){
@@ -2097,7 +2149,7 @@ var GROUP=[
 ];
 var TIME_SEED={
   work:['健身教练','直播','其他工作'],
-  life:['睡觉','吃饭','通勤','收拾自己'],
+  life:['吃饭','通勤','收拾自己'],
   growth:['学习','运动健身','内容创作'],
   leisure:['娱乐','社交','玩游戏']
 };
@@ -2143,9 +2195,10 @@ VIEWS.time=function(){
 
 /* ---------- 每日记录 ---------- */
 Time.recHTML=function(){
-  var d=Time.date,list=timeEntries(d);
+  var d=Time.date,list=timeEntries(d).filter(function(e){return e.cat!=='睡觉'});
   var gt={work:0,life:0,growth:0,leisure:0};
   list.forEach(function(e){gt[e.group]=(gt[e.group]||0)+(+e.hrs||0)});
+  gt.life+=(sleepOf(d).h||0);
   var total=gt.work+gt.life+gt.growth+gt.leisure;
   var html='<div class="datebar"><button onclick="Time.date=addD(Time.date,-1);rerender()">‹</button><b>'+dispD(d)+(d===TODAY()?' · 今天':'')+'</b><button onclick="Time.date=addD(Time.date,1);rerender()">›</button></div>';
 
@@ -2166,12 +2219,18 @@ Time.recHTML=function(){
     '<button class="btn btn-sm" style="margin-left:auto" onclick="Time.openForm()">＋ 新增</button></div>';
   if(!list.length)html+='<div class="empty">还没有记录，点「＋ 新增」开始吧 ✨</div>';
   list.forEach(function(e){
+    if(e.cat==='睡觉')return;
     var g=GROUP.filter(function(x){return x.k===e.group})[0]||GROUP[0];
     html+='<div class="li"><div class="emoji" style="background:'+g.color+'33">'+g.emoji+'</div>'+
       '<div class="grow"><div class="name">'+esc(e.cat)+'</div><div class="desc">'+fmtHrs(e.hrs)+(e.note?' · '+esc(e.note):'')+'</div></div>'+
       '<button class="btn btn-sm" style="margin-right:6px" onclick="Time.openForm(\''+e.id+'\')">改</button>'+
       '<button class="del-x" onclick="Time.del(\''+e.id+'\')">✕</button></div>';
   });
+  var sl=sleepOf(d);
+  if(sl.h!=null)html+='<div class="li" style="background:#F3F0F8">'+
+    '<div class="emoji" style="background:#B79CE033">🏠</div>'+
+    '<div class="grow"><div class="name">睡觉</div><div class="desc">'+fmtHrs(sl.h)+' · 自动同步自睡眠记录</div></div>'+
+    '<button class="btn btn-sm" onclick="Body.date=\''+d+'\';showView(\'body\')">去改 ›</button></div>';
   html+='</div>';
 
   var sm=timeStudyMins(d)/60;
@@ -2182,9 +2241,10 @@ Time.recHTML=function(){
 /* ---------- 时间分析 ---------- */
 Time.anaHTML=function(){
   var d=TODAY();
-  var list=timeEntries(d);
+  var list=timeEntries(d).filter(function(e){return e.cat!=='睡觉'});
   var gt={work:0,life:0,growth:0,leisure:0};
   list.forEach(function(e){gt[e.group]=(gt[e.group]||0)+(+e.hrs||0)});
+  gt.life+=(sleepOf(d).h||0);
   var total=gt.work+gt.life+gt.growth+gt.leisure;
   var html='';
 
@@ -2220,7 +2280,7 @@ Time.anaHTML=function(){
       if(inc>dayMoney(hi).inc)hi=dd;
       if(inc<dayMoney(lo).inc)lo=dd;
     });
-    function gOf(dd){var g={work:0,life:0,growth:0,leisure:0};(DB.time.log[dd]||[]).forEach(function(e){g[e.group]+=(+e.hrs||0)});return g}
+    function gOf(dd){var g={work:0,life:0,growth:0,leisure:0};(DB.time.log[dd]||[]).forEach(function(e){if(e.cat!=='睡觉')g[e.group]+=(+e.hrs||0)});g.life+=(sleepOf(dd).h||0);return g}
     html+='<div class="card"><div class="h2">💰 高收入日 vs 低收入日</div>'+
       '<div class="grid2">'+
       '<div class="card" style="margin:0;padding:10px"><div class="muted">高收入日</div><div class="stat-num red" style="font-size:1.05rem">+'+fm(dayMoney(hi).inc)+'</div><div class="muted" style="font-size:.7rem">'+dispD(hi)+'</div>'+groupRing(GROUP.map(function(gp){return {l:gp.label,v:gOf(hi)[gp.k],color:gp.color}}),92)+'</div>'+
@@ -2304,6 +2364,7 @@ Time.durHint=function(){
 Time.save=function(id){
   var date=Time.date;
   var cat=$('#tCat').value.trim();
+  if(cat==='睡觉'){toast('😴 睡觉由「身体管理」自动同步，去那里记录即可');return;}
   if(!cat){toast('填一下活动名称吧');return;}
   var grp=(document.querySelector('#tGroupRow .chip.on')||{}).dataset;grp=grp?grp.group:'work';
   var h=parseDur($('#tDur').value);
@@ -2322,6 +2383,14 @@ Time.del=function(id){
   DB.time.log[Time.date]=timeEntries(Time.date).filter(function(e){return e.id!==id});
   save();rerender();toast('已删除');
 };
+/* 一站式页面：按分类快速设定某天时长（分钟）→ 写入时间管理 */
+Time.quickSet=function(date,cat,group,minutes){
+  minutes=+minutes||0;
+  if(!DB.time.log[date])DB.time.log[date]=[];
+  DB.time.log[date]=DB.time.log[date].filter(function(e){return e.cat!==cat});
+  if(minutes>0)DB.time.log[date].push({id:uid(),cat:cat,group:group,hrs:minutes/60,note:''});
+  save();rerender();toast('⏱️ '+cat+' 已记录 '+minutes+' 分钟');
+};
 
 </script>
 <script>
@@ -2331,13 +2400,18 @@ var Growth={tab:'vision'};
 var EMOWORDS=[{e:'😊',t:'开心'},{e:'🥰',t:'喜悦'},{e:'😌',t:'平静'},{e:'🔥',t:'兴奋'},{e:'😟',t:'焦虑'},{e:'😩',t:'疲惫'},{e:'🎯',t:'专注'},{e:'😢',t:'低落'}];
 
 VIEWS.growth=function(){
-  var tabs=[['vision','🌟 愿景板'],['miracle','✨ 奇迹日志'],['emotion','💗 情绪能量'],['achieve','🏆 成就墙'],['gratitude','🙏 感恩'],['inspire','💡 灵感本'],['student','🌱 学员成长'],['report','🌈 周报']];
+  var tabs=[['vision','🌟 愿景板'],['aware','💡 灵感觉察'],['emotion','💗 情绪能量'],['achieve','🏆 成就墙'],['gratitude','🙏 感恩'],['report','🌈 周报']];
   var html='<div class="subtabs" style="flex-wrap:wrap">';
   tabs.forEach(function(t){html+='<button class="'+(Growth.tab===t[0]?'on':'')+'" onclick="Growth.tab=\''+t[0]+'\';'+(t[0]==='emotion'?'Growth.emoDate=TODAY();':'')+'rerender()">'+t[1]+'</button>'});
   html+='</div>';
-  var f={'vision':Growth.visionHTML,'miracle':Growth.miracleHTML,'emotion':Growth.emotionHTML,'achieve':Growth.achieveHTML,'gratitude':Growth.gratitudeHTML,'inspire':Growth.inspireHTML,'student':Growth.studentHTML,'report':Growth.reportHTML}[Growth.tab];
+  var f={'vision':Growth.visionHTML,'aware':Growth.awareHTML,'emotion':Growth.emotionHTML,'achieve':Growth.achieveHTML,'gratitude':Growth.gratitudeHTML,'report':Growth.reportHTML}[Growth.tab];
   html+=f();
   $('#view').innerHTML=html;
+};
+
+/* ---- 灵感觉察（合并 灵感+奇迹+学员） ---- */
+Growth.awareHTML=function(){
+  return Growth.miracleHTML()+Growth.inspireHTML()+Growth.studentHTML();
 };
 
 /* ---- 愿景板 ---- */
@@ -2369,7 +2443,7 @@ Growth.miracleHTML=function(){
   if(!keys.length)html+='<div class="empty">还没有记录，今天留意一下 ✨</div>';
   keys.forEach(function(k){
     DB.miracle[k].forEach(function(t,i){
-      html+='<div class="li"><div class="emoji">✨</div><div class="grow"><div class="name">'+esc(t)+'</div><div class="desc muted">'+dispD(k)+'</div></div><button class="del-x" onclick="Growth.delMiracle(\''+k+'\','+i+')">✕</button></div>';
+      html+='<div class="li"><div class="emoji">✨</div><div class="grow"><div class="name">'+esc(t)+'</div><div class="desc muted">'+dispD(k)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentMiracle(\''+k+'\','+i+')">📱转内容</button><button class="del-x" onclick="Growth.delMiracle(\''+k+'\','+i+')">✕</button></div>';
     });
   });
   html+='</div>';
@@ -2406,6 +2480,7 @@ Growth.saveEmo=function(){
   var d=Growth.emoDate||TODAY();var mEl=document.querySelector('#emRow .chip.on');var mood=mEl?mEl.dataset.e:'';
   var en=parseInt($('#emEnergy').value);if(!en||en<1||en>10){toast('填一下能量值(1-10)');return}
   DB.emotion[d]={mood:mood,energy:en,trig:$('#emTrig').value.trim()};
+  if(mood)DB.mood[d]=EMO_TO_MOOD[mood]||mood;
   save();rerender();
   toast(d===TODAY()?'💗 已记录，看见自己的情绪很棒':'💗 已补记 '+dispD(d)+' 的情绪');
 };
@@ -2464,7 +2539,7 @@ Growth.inspireHTML=function(){
   var list=DB.inspire.slice().reverse();
   if(!list.length)html+='<div class="empty">还没有灵感记录</div>';
   list.forEach(function(it){
-    html+='<div class="li"><div class="emoji">💡</div><div class="grow"><div class="name">'+esc(it.note)+'</div><div class="desc muted">'+dispD(it.date)+'</div></div><button class="del-x" onclick="Growth.delInspire(\''+it.id+'\')">✕</button></div>';
+    html+='<div class="li"><div class="emoji">💡</div><div class="grow"><div class="name">'+esc(it.note)+'</div><div class="desc muted">'+dispD(it.date)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentInspire(\''+it.id+'\')">📱转内容</button><button class="del-x" onclick="Growth.delInspire(\''+it.id+'\')">✕</button></div>';
   });
   html+='</div>';
   return html;
@@ -2484,7 +2559,7 @@ Growth.studentHTML=function(){
   var list=DB.student.slice().reverse();
   if(!list.length)html+='<div class="empty">还没有记录</div>';
   list.forEach(function(it){
-    html+='<div class="li"><div class="emoji" style="background:#B79CE033">🌱</div><div class="grow"><div class="name">'+esc(it.name)+' <span class="muted">'+dispD(it.date)+'</span></div><div class="desc">'+esc(it.story)+'</div></div><button class="del-x" onclick="Growth.delStudent(\''+it.id+'\')">✕</button></div>';
+    html+='<div class="li"><div class="emoji" style="background:#B79CE033">🌱</div><div class="grow"><div class="name">'+esc(it.name)+' <span class="muted">'+dispD(it.date)+'</span></div><div class="desc">'+esc(it.story)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentStudent(\''+it.id+'\')">📱转内容</button><button class="del-x" onclick="Growth.delStudent(\''+it.id+'\')">✕</button></div>';
   });
   html+='</div>';
   return html;
@@ -2521,6 +2596,16 @@ Growth.copyReport=function(){
   if(t){t.select();try{document.execCommand('copy')}catch(e){}}
   toast('📋 已复制，去发圈吧～');
 };
+/* 素材一键转内容（不覆盖已有内容数据） */
+Growth.toContent=function(title,note){
+  if(!title&&!note)return;
+  DB.content.push({id:uid(),date:TODAY(),platform:'',title:(title||'').slice(0,40),type:'笔记',time:'',views:0,likes:0,comments:0,saves:0,fans:0,tag:'',note:(note||'').slice(0,200)});
+  save();rerender();toast('📱 已转到内容，去补充数据～');
+};
+Growth.toContentMiracle=function(k,i){var t=DB.miracle[k]&&DB.miracle[k][i];if(t)Growth.toContent(t)};
+Growth.toContentInspire=function(id){var it=DB.inspire.find(function(x){return x.id===id});if(it)Growth.toContent(it.note)};
+Growth.toContentStudent=function(id){var it=DB.student.find(function(x){return x.id===id});if(it)Growth.toContent('学员'+it.name+'：'+it.story)};
+Growth.toContentTarot=function(d){var t=DB.tarot[d];if(t)Growth.toContent('塔罗·'+(t.card||''),t.note)};
 
 </script>
 <script>boot();</script>
