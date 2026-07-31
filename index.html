@@ -1604,35 +1604,31 @@ Body.dayHTML=function(){
   var water=waterOf(d),goal=DB.settings.waterGoal;
   var sl=sleepOf(d);
   var html='<div class="datebar"><button onclick="Body.date=addD(Body.date,-1);rerender()">‹</button><b>'+dispD(d)+(d===TODAY()?' · 今天':'')+'</b><button onclick="Body.date=addD(Body.date,1);rerender()">›</button></div>';
-  // 喝水（联动习惯）
-  html+='<div class="card"><div class="h2">💧 喝水量 <span class="sub">与习惯打卡联动</span></div>'+
-    '<div class="row"><b class="grow">'+water+' / '+goal+' ml</b>'+
-    '<button class="btn btn-sm" onclick="addWater(250,\''+d+'\')">+250</button><button class="btn btn-sm" onclick="addWater(500,\''+d+'\')">+500</button></div>'+
-    '<div class="prog mt8"><i style="width:'+Math.min(100,water/goal*100)+'%"></i></div></div>';
+  // 喝水（只读，来自记录今天）
+  html+='<div class="card"><div class="h2">💧 喝水量 <span class="sub">来自「记录今天」</span></div>'+
+    '<div class="row"><b class="grow">'+water+' / '+goal+' ml</b></div>'+
+    '<div class="prog mt8"><i style="width:'+Math.min(100,water/goal*100)+'%"></i></div>'+
+    (water>=goal?'<div class="muted mt8">🎉 今日目标已达成</div>':'<div class="muted mt8">还没达标，去「记录今天」补喝几杯吧～</div>')+'</div>';
   // 吃药
   html+='<div class="card"><div class="h2">💊 吃药/补剂记录</div>';
   (bd.meds||[]).forEach(function(m,i){
     html+='<div class="li"><div class="ck '+(m.on?'on':'')+'" onclick="Body.toggleMed(\''+d+'\','+i+')">✓</div><div class="grow name'+(m.on?' muted':'')+'">'+esc(m.n)+'</div><button class="del-x" onclick="Body.delMed(\''+d+'\','+i+')">✕</button></div>';
   });
   html+='<div class="row mt8"><input class="input grow" id="medInp" placeholder="药品/补剂名称，如：维生素C"><button class="btn btn-p" onclick="Body.addMed(\''+d+'\')">添加</button></div></div>';
-  // 睡眠
+  // 睡眠（只读，来自记录今天）
   var s=bd.sleep||{};
-  html+='<div class="card"><div class="h2">😴 睡眠记录</div>'+
-    '<div class="grid2"><div><label class="fl">昨晚几点睡</label><input class="input" type="time" value="'+esc(s.bed||'')+'" onchange="Body.setSleep(\''+d+'\',\'bed\',this.value)"></div>'+
-    '<div><label class="fl">今早几点起</label><input class="input" type="time" value="'+esc(s.wake||'')+'" onchange="Body.setSleep(\''+d+'\',\'wake\',this.value)"></div></div>';
-  if(sl.h!=null)html+='<div class="stat-box mt12"><div class="stat-num purple">'+sl.h+' 小时</div><div class="muted">自动计算睡眠时长'+(sl.h>=7?' · 睡饱啦 🌞':' · 有点少哦，今晚早点睡 💤')+'</div></div>';
-  html+='<label class="fl">睡眠质量</label><div>';
-  ['好','一般','差'].forEach(function(q){
-    html+='<button class="chip'+(s.q===q?' on':'')+'" onclick="Body.setSleep(\''+d+'\',\'q\',\''+q+'\')">'+(q==='好'?'😊 好':q==='一般'?'😐 一般':'😫 差')+'</button>';
-  });
-  html+='</div><label class="fl">备注</label><input class="input" placeholder="如：做梦多、起夜一次" value="'+esc(s.note||'')+'" onchange="Body.setSleep(\''+d+'\',\'note\',this.value)"></div>';
-  // 大便记录（选填，非硬性每天指标）
+  html+='<div class="card"><div class="h2">😴 睡眠记录 <span class="sub">来自「记录今天」</span></div>';
+  if(sl.h!=null){
+    html+='<div class="stat-box mt12"><div class="stat-num purple">'+sl.h+' 小时</div><div class="muted">自动计算睡眠时长'+(sl.h>=7?' · 睡饱啦 🌞':' · 有点少哦，今晚早点睡 💤')+'</div></div>';
+    if(s.q)html+='<div class="mt8"><span class="chip on">'+(s.q==='好'?'😊 好':s.q==='一般'?'😐 一般':'😫 差')+'</span></div>';
+    if(s.note)html+='<div class="muted mt8">'+esc(s.note)+'</div>';
+  }else html+='<div class="empty">今天还没记睡眠，去「记录今天」填一下吧</div>';
+  html+='</div>';
+  // 大便（只读，来自记录今天）
   var bdx=bday(d);
-  html+='<div class="card"><div class="h2">🚽 大便记录 <span class="sub">选填 · 看身体通不通畅</span></div>'+
-    '<div class="row"><span class="grow">今天上了 <b>'+((bdx.bowel||0))+'</b> 次</span>'+
-    '<button class="btn btn-sm" onclick="Body.bowelInc(\''+d+'\',-1)">－</button>'+
-    '<button class="btn btn-sm" onclick="Body.bowelInc(\''+d+'\',1)">＋</button></div>'+
-    '<label class="fl">备注（选填，如：偏软/偏硬/颜色）</label><input class="input" placeholder="记录一下状态" value="'+esc(bdx.bowelNote||'')+'" onchange="Body.setBowelNote(\''+d+'\',this.value)"></div>';
+  html+='<div class="card"><div class="h2">🚽 大便记录 <span class="sub">来自「记录今天」</span></div>'+
+    '<div class="row"><span class="grow">今天上了 <b>'+((bdx.bowel||0))+'</b> 次</span></div>'+
+    (bdx.bowelNote?'<div class="muted mt8">'+esc(bdx.bowelNote)+'</div>':'<div class="muted mt8">还没记录，去「记录今天」填一下吧～</div>')+'</div>';
   // 经期
   var pp=periodPredict();
   html+='<div class="card"><div class="h2">🌸 月经周期</div>';
@@ -1694,10 +1690,13 @@ Body.weekHTML=function(){
     '<div class="grid2">'+
     '<div><label class="fl">体重（kg）</label><input class="input" type="number" step="0.1" value="'+(w.weight||'')+'" onchange="Body.setW(\''+ws+'\',\'weight\',this.value)"></div>'+
     '<div><label class="fl">体脂率（%）</label><input class="input" type="number" step="0.1" value="'+(w.fat||'')+'" onchange="Body.setW(\''+ws+'\',\'fat\',this.value)"></div>'+
-    '<div><label class="fl">腰围（cm，选填）</label><input class="input" type="number" step="0.1" value="'+(w.waist||'')+'" onchange="Body.setW(\''+ws+'\',\'waist\',this.value)"></div>'+
-    '<div><label class="fl">运动次数</label><div class="auto-box">'+wods.length+' 次 · 自动统计（运动打卡天数）</div></div>'+
+    '<div><label class="fl">胸围（cm）</label><input class="input" type="number" step="0.1" value="'+(w.chest||'')+'" onchange="Body.setW(\''+ws+'\',\'chest\',this.value)"></div>'+
+    '<div><label class="fl">腰围（cm）</label><input class="input" type="number" step="0.1" value="'+(w.waist||'')+'" onchange="Body.setW(\''+ws+'\',\'waist\',this.value)"></div>'+
+    '<div><label class="fl">臀围（cm）</label><input class="input" type="number" step="0.1" value="'+(w.hip||'')+'" onchange="Body.setW(\''+ws+'\',\'hip\',this.value)"></div>'+
+    '<div><label class="fl">运动次数</label><div class="auto-box">'+wods.length+' 次 · 自动统计</div></div>'+
     '</div>'+
     '<label class="fl">运动总时长（分钟）</label><div class="auto-box">'+exMin+' 分钟 · 自动统计（时间管理·运动健身）</div>'+
+    '<label class="fl">腰臀比</label><div class="auto-box">'+(w.waist&&w.hip?Math.round(w.waist/w.hip*100)/100:'—')+' <span class="muted">（腰÷臀，健康约 0.7-0.85）</span></div>'+
     '<label class="fl">身体状态备注</label><textarea class="ta" onchange="Body.setW(\''+ws+'\',\'note\',this.value)">'+esc(w.note||'')+'</textarea></div>';
   // 本周睡眠 & 大便总结（自动汇总自每日记录）
   var wDays=weekDays(ws);
@@ -1738,6 +1737,13 @@ Body.trendHTML=function(){
   var html='<div class="card"><div class="h2">📉 体重变化（kg · 近3个月）</div>'+lineChart(wItems,{c:'#B79CE0'})+'</div>';
   var fItems=weeks.map(function(ws){var w=DB.body.week[ws]||{};return {l:(P(ws).getMonth()+1)+'/'+P(ws).getDate(),v:w.fat!==''&&w.fat!=null?w.fat:null}});
   html+='<div class="card"><div class="h2">📉 体脂率变化（%）</div>'+lineChart(fItems,{c:'#F5A8BC'})+'</div>';
+  var cItems=weeks.map(function(ws){var w=DB.body.week[ws]||{};return {l:(P(ws).getMonth()+1)+'/'+P(ws).getDate(),v:w.chest!==''&&w.chest!=null?w.chest:null}});
+  var waItems=weeks.map(function(ws){var w=DB.body.week[ws]||{};return {l:(P(ws).getMonth()+1)+'/'+P(ws).getDate(),v:w.waist!==''&&w.waist!=null?w.waist:null}});
+  var hItems=weeks.map(function(ws){var w=DB.body.week[ws]||{};return {l:(P(ws).getMonth()+1)+'/'+P(ws).getDate(),v:w.hip!==''&&w.hip!=null?w.hip:null}});
+  html+='<div class="card"><div class="h2">📐 三围变化（cm · 近3个月）</div>'+
+    '<div class="muted" style="margin-bottom:6px">🩷 胸围</div>'+lineChart(cItems,{c:'#F5A8BC'})+
+    '<div class="muted mt8" style="margin-bottom:6px">💜 腰围</div>'+lineChart(waItems,{c:'#B79CE0'})+
+    '<div class="muted mt8" style="margin-bottom:6px">🩵 臀围</div>'+lineChart(hItems,{c:'#93B8E8'})+'</div>';
   // 本周睡眠
   var wk=weekDays(TODAY());
   var wkS=wk.filter(function(d){return sleepOf(d).h!=null});
