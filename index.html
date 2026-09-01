@@ -251,7 +251,7 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
   <button data-v="home" onclick="showView('home')"><span class="ti">🏠</span><span>首页</span></button>
   <button data-v="habits" onclick="showView('habits')"><span class="ti">✅</span><span>打卡</span></button>
   <button data-v="plans" onclick="showView('plans')"><span class="ti">🗓️</span><span>计划</span></button>
-  <button data-v="money" onclick="showView('money')"><span class="ti">💰</span><span>财富</span></button>
+  <button data-v="nospend" onclick="showView('nospend')"><span class="ti">🛍️</span><span>不消费</span></button>
   <button data-v="more" onclick="openMore()"><span class="ti">✨</span><span>更多</span></button>
 </nav>
 
@@ -261,7 +261,7 @@ label.fl{display:block;font-size:.75rem;color:var(--muted);margin:10px 0 4px}
   <div class="sheet-grid">
     <button onclick="closeMore();showView('study')"><span>📖</span>学习管理</button>
     <button onclick="closeMore();showView('body')"><span>🌸</span>身体管理</button>
-    <button onclick="closeMore();showView('content')"><span>📱</span>内容创作</button>
+    <button onclick="closeMore();showView('money')"><span>💰</span>财富管理</button>
     <button onclick="closeMore();showView('time')"><span>⏱️</span>时间管理</button>
     <button onclick="closeMore();showView('review')"><span>🌙</span>复盘管理</button>
     <button onclick="closeMore();showView('growth')"><span>💫</span>成长显化</button>
@@ -489,7 +489,7 @@ function defaults(){
     },
     body:{day:{},week:{},period:[]},  // day[date]={meds:[{n,on}],sleep:{bed,wake,q,note}}  week[ws]={weight,fat,waist,times,mins,note}
     mood:{},             // mood[date] = emoji
-    content:[],          // {id,date,platform,title,type,time,views,likes,comments,saves,fans,tag,note}
+    nospend:null,          // 不消费打卡（结构见 nospend.js nsDefault()）
     review:{d:{},w:{},m:{}},
     time:{log:{}},         // time.log[date] = [{id,cat,group,hrs,note}]
     vision:[],             // 愿景板条目 [{id,emoji,text}]
@@ -512,6 +512,7 @@ function loadDB(){
   for(var k2 in d.money){if(DB.money[k2]===undefined)DB.money[k2]=d.money[k2]}
   for(var k3 in d.plans){if(DB.plans[k3]===undefined)DB.plans[k3]=d.plans[k3]}
   for(var k4 in d.body){if(DB.body[k4]===undefined)DB.body[k4]=d.body[k4]}
+  if(!DB.nospend||typeof DB.nospend!=='object')DB.nospend=nsDefault();
   // 迁移：睡觉改由身体管理同步，清除时间管理里独立的「睡觉」条目
   if(!DB._mig_sleep){
     if(DB.time&&DB.time.log)Object.keys(DB.time.log).forEach(function(k){DB.time.log[k]=(DB.time.log[k]||[]).filter(function(e){return e.cat!=='睡觉'})});
@@ -547,7 +548,7 @@ function loadFix(){var t=DB;DB=t;var d=defaults();for(var k in d){if(DB[k]===und
 /* ================= 视图路由 ================= */
 var S={view:'home'};
 var VIEWS={};
-var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',content:'📱 内容创作',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化',onestop:'📝 记录今天'};
+var TITLES={home:'🌷 显化人生',habits:'✅ 习惯打卡',plans:'🗓️ 计划管理',study:'📖 学习管理',money:'💰 财富管理',body:'🌸 身体管理',review:'🌙 复盘管理',time:'⏱️ 时间管理',growth:'💫 成长显化',onestop:'📝 记录今天',nospend:'🛍️ 不消费打卡'};
 function showView(v,opt){
   S.view=v;
   $('#topTitle').textContent=TITLES[v]||'🌷 显化人生';
@@ -761,12 +762,13 @@ VIEWS.home=function(){
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="OneStop.date=TODAY();showView(\'onestop\')">📝 记录今天</button>';
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Review.dDate=TODAY();Review.tab=\'d\';showView(\'review\')">🌙 感恩复盘</button>';
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Growth.tab=\'vision\';showView(\'growth\')">💫 成长显化</button>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="showView(\'nospend\')">🛍️ 不消费打卡</button>';
 
   // 快捷入口
   html+='<div class="card"><div class="grid2" style="gap:8px">'+
     '<button class="btn" onclick="showView(\'study\')">📖 学习管理</button>'+
     '<button class="btn" onclick="showView(\'body\')">🌸 身体管理</button>'+
-    '<button class="btn" onclick="showView(\'content\')">📱 内容创作</button>'+
+    '<button class="btn" onclick="showView(\'time\')">⏱️ 时间管理</button>'+
     '<button class="btn" onclick="showView(\'money\')">💰 财富管理</button>'+
     '</div></div>';
 
@@ -1316,7 +1318,7 @@ Study.tarotHTML=function(){
   if(!keys.length)html+='<div class="empty">还没有抽牌记录</div>';
   keys.forEach(function(k){
     var t=DB.tarot[k];
-    html+='<div class="li"><div class="emoji">🔮</div><div class="grow"><div class="name">'+dispD(k)+' · '+esc(t.card||'')+'</div><div class="desc">'+(t.note?esc(t.note):'')+(t.symbol?' · <span class="muted">'+esc(t.symbol)+'</span>':'')+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentTarot(\''+k+'\')">📱转内容</button></div>';
+    html+='<div class="li"><div class="emoji">🔮</div><div class="grow"><div class="name">'+dispD(k)+' · '+esc(t.card||'')+'</div><div class="desc">'+(t.note?esc(t.note):'')+(t.symbol?' · <span class="muted">'+esc(t.symbol)+'</span>':'')+'</div></div></div>';
   });
   html+='</div>';
   return html;
@@ -1496,6 +1498,13 @@ Money.ovHTML=function(){
     '<div class="prog green mt8"><i style="width:'+dp+'%"></i></div>'+
     '<div class="muted mt8">已还 '+dp.toFixed(1)+'% · 每一笔都在靠近自由 💪</div>'+
     '<button class="btn btn-full mt8" onclick="Money.payOne(\''+mk+'\')">✓ 记一笔月还款（-'+fm(M.monthlyPay)+'）</button></div>';
+  var nsM=nsStats(monthDays(mk)),nsA=nsStats(null);
+  if(nsA.urge||nsM.saved)
+    html+='<div class="card"><div class="h2">🛍️ 不消费省下 <span class="sub">只做展示，不计入收支</span></div>'+
+      '<div class="grid2">'+
+      '<div class="stat-box"><div class="stat-num purple">'+fm(nsM.saved)+'</div><div class="muted">本月少花（元）</div></div>'+
+      '<div class="stat-box"><div class="stat-num green">'+fm(nsA.saved)+'</div><div class="muted">累计少花（元）</div></div></div>'+
+      '<div class="muted mt8">忍住 '+nsA.hold+' 次 · 破戒 '+nsA.buy+' 次 · <a href="#" onclick="showView(\'nospend\');return false;" style="color:#D98BA6;text-decoration:underline">去不消费打卡 ›</a></div></div>';
   return html;
 };
 Money.editGoal=function(mk){
@@ -1806,150 +1815,500 @@ Body.trendHTML=function(){
 </script>
 <script>
 'use strict';
-/* ================= 内容创作 ================= */
-var Content={tab:'list',month:mKey(TODAY())};
-var PLATFORMS=['小红书','抖音','B站','朋友圈','其他'];
-var CTYPES=['短视频','图文','直播','笔记'];
+/* ================= 不消费打卡（一年不消费挑战） ================= */
+var NoSpend={tab:'home',lt:'buy',form:{emo:'',inten:0,trig:'',res:'hold',exc:false}};
+var NS_EMO=['😍心动','😰焦虑','😴无聊','😤压力大','🥺难过','😊开心','🤝社交'];
+var NS_RES=[['hold','🙅 忍住了'],['cool','⏳ 进冷静期'],['buy','🛍️ 买了']];
+var NS_INV_CATS=['服饰','鞋包','美妆护肤','饰品','家居','数码','书籍','运动装备','其他'];
+var NS_COOL=30;
 
-function contentOfMonth(mk){return DB.content.filter(function(c){return mKey(c.date)===mk})}
-function engageRate(c){
-  var v=+c.views||0;if(!v)return null;
-  return Math.round(((+c.likes||0)+(+c.comments||0)+(+c.saves||0))/v*1000)/10;
+function nsDefault(){
+  return {
+    set:{
+      start:'',end:'',excPerMonth:2,
+      cats:['服饰','美妆护肤','鞋包','饰品','家居装饰','数码','盲盒手办','奶茶甜品','外卖','图书','课程']
+    },
+    urge:[],   // {id,date,item,amt,emo,inten,trig,res,why,after,exc}
+    buy:[],    // {id,item,reason,budget,deadline,added,status}
+    ban:[
+      {id:'b1',name:'快时尚服饰',note:'再便宜也不买'},
+      {id:'b2',name:'盲盒 / 手办',note:''},
+      {id:'b3',name:'奶茶饮料',note:'自带水杯'},
+      {id:'b4',name:'限时折扣囤货',note:'囤货=浪费'},
+      {id:'b5',name:'美妆囤货',note:'用完再买'},
+      {id:'b6',name:'网红小家电',note:''}
+    ],
+    trig:[
+      {id:'t1',name:'直播间',level:'高',strategy:'先退出，加入冷静期30天'},
+      {id:'t2',name:'小红书种草',level:'高',strategy:'取关种草号'},
+      {id:'t3',name:'和朋友逛街',level:'中',strategy:'提前说好只看不买'},
+      {id:'t4',name:'情绪低落',level:'高',strategy:'去运动 / 写日记，不逛购物app'},
+      {id:'t5',name:'无聊刷手机',level:'中',strategy:'换成看书 / 拉伸'}
+    ],
+    inv:[],    // {id,cat,name,qty,idle,value}
+    jar:[
+      {id:'j1',name:'还贷基金',target:100000,saved:0},
+      {id:'j2',name:'留学基金',target:50000,saved:0},
+      {id:'j3',name:'大房子首付',target:300000,saved:0}
+    ]
+  };
+}
+function NS(){if(!DB.nospend)DB.nospend=nsDefault();return DB.nospend}
+
+/* ---- 统计 ---- */
+function nsStats(dates){
+  var us=(NS().urge||[]).filter(function(u){return !dates||dates.indexOf(u.date)>=0});
+  var o={urge:us.length,hold:0,cool:0,buy:0,saved:0,spent:0};
+  us.forEach(function(u){
+    if(u.res==='hold'){o.hold++;o.saved+=+u.amt||0}
+    else if(u.res==='cool')o.cool++;
+    else{o.buy++;o.spent+=+u.amt||0}
+  });
+  o.rate=o.urge?o.hold/o.urge:0;
+  return o;
+}
+function nsSummary(dates){
+  var s=nsStats(dates);
+  if(!s.urge)return '—';
+  return '冲动'+s.urge+' · 忍住'+s.hold+' · 买了'+s.buy+' · 少花¥'+fm(s.saved);
+}
+function nsProg(){
+  var s=NS().set;
+  if(!s.start)return null;
+  var total=s.end?daysDiff(s.start,s.end)+1:365;
+  var done=s.start>TODAY()?0:Math.min(total,daysDiff(s.start,TODAY())+1);
+  return {done:done,total:total,pct:total?Math.min(1,done/total):0};
+}
+function nsStreak(){
+  var s=NS().set,end=(s.end&&s.end<TODAY())?s.end:TODAY();
+  if(!s.start||end<s.start)return 0;
+  var n=0,d=end,g=0;
+  while(g++<3000){
+    if(d<s.start)break;
+    var bad=(NS().urge||[]).some(function(u){return u.date===d&&u.res==='buy'});
+    if(bad)break;
+    n++;d=addD(d,-1);
+  }
+  return n;
+}
+function nsExcUsed(mk){
+  mk=mk||mKey(TODAY());
+  return (NS().urge||[]).filter(function(u){return u.res==='buy'&&u.exc&&mKey(u.date)===mk}).length;
+}
+function nsBadges(){
+  var a=nsStats(null),s=nsStreak(),inv=(NS().inv||[]).length;
+  return [
+    {e:'🌱',n:'第一次忍住',ok:a.hold>=1},
+    {e:'🔥',n:'连续3天零破戒',ok:s>=3},
+    {e:'⭐',n:'连续7天零破戒',ok:s>=7},
+    {e:'💎',n:'连续30天零破戒',ok:s>=30},
+    {e:'👑',n:'连续100天零破戒',ok:s>=100},
+    {e:'💰',n:'省下1000元',ok:a.saved>=1000},
+    {e:'💵',n:'省下5000元',ok:a.saved>=5000},
+    {e:'🏆',n:'省下10000元',ok:a.saved>=10000},
+    {e:'📦',n:'清点100件物品',ok:inv>=100},
+    {e:'🧘',n:'忍住率80%',ok:a.urge>=10&&a.rate>=0.8}
+  ];
+}
+function nsMonths(n){
+  var a=[],mk=mKey(TODAY()),m=mk;
+  for(var i=0;i<n;i++){a.unshift(m);m=prevMK(m)}
+  return a;
 }
 
-VIEWS.content=function(){
-  var html='<div class="subtabs">'+
-    '<button class="'+(Content.tab==='list'?'on':'')+'" onclick="Content.tab=\'list\';rerender()">创作记录</button>'+
-    '<button class="'+(Content.tab==='stat'?'on':'')+'" onclick="Content.tab=\'stat\';rerender()">创作统计</button></div>';
-  html+=Content.tab==='list'?Content.listHTML():Content.statHTML();
+/* ================= 视图 ================= */
+VIEWS.nospend=function(){
+  var t=NoSpend.tab;
+  var tabs=[['home','🏠 概览'],['urge','⚡ 冲动'],['list','📋 清单'],['inv','📦 清点'],['jar','🫙 储蓄罐'],['stat','📊 统计']];
+  var html='<div class="subtabs">'+tabs.map(function(x){
+    return '<button class="'+(t===x[0]?'on':'')+'" onclick="NoSpend.tab=\''+x[0]+'\';rerender()">'+x[1]+'</button>';
+  }).join('')+'</div>';
+  html+=t==='home'?NoSpend.homeHTML():t==='urge'?NoSpend.urgeHTML():t==='list'?NoSpend.listHTML():
+        t==='inv'?NoSpend.invHTML():t==='jar'?NoSpend.jarHTML():NoSpend.statHTML();
   $('#view').innerHTML=html;
 };
 
-Content.listHTML=function(){
-  var mk=Content.month,list=contentOfMonth(mk).sort(function(a,b){return a.date<b.date?1:-1});
-  var html='<div class="datebar"><button onclick="Content.month=prevMK(Content.month);rerender()">‹</button><b>'+mk.replace('-','年')+'月 · '+list.length+'条</b><button onclick="Content.month=nextMK(Content.month);rerender()">›</button></div>';
-  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="Content.edit()">＋ 记录今天发布的内容</button>';
-  if(!list.length)html+='<div class="card"><div class="empty">这个月还没有记录<br>拍了发了就来记一笔 ✨</div></div>';
-  list.forEach(function(c){
-    var er=engageRate(c);
-    html+='<div class="card">'+
-      '<div class="row"><div class="grow"><b>'+esc(c.title)+'</b>'+
-      (c.tag==='hot'?' <span class="chip tag-hot">🔥爆款</span>':c.tag==='bad'?' <span class="chip tag-bad">📉待改进</span>':'')+
-      '<div class="muted mt8">'+esc(c.platform)+' · '+esc(c.type)+' · '+dispD(c.date)+(c.time?' '+esc(c.time):'')+'</div></div>'+
-      '<button class="del-x" onclick="Content.edit(\''+c.id+'\')">✎</button></div>';
-    html+='<div class="grid3 mt8" style="grid-template-columns:repeat(5,1fr);gap:4px">'+
-      '<div class="center"><div style="font-weight:700">'+fm(c.views||0)+'</div><div class="muted" style="font-size:.62rem">播放/阅读</div></div>'+
-      '<div class="center"><div style="font-weight:700">'+fm(c.likes||0)+'</div><div class="muted" style="font-size:.62rem">点赞</div></div>'+
-      '<div class="center"><div style="font-weight:700">'+fm(c.comments||0)+'</div><div class="muted" style="font-size:.62rem">评论</div></div>'+
-      '<div class="center"><div style="font-weight:700">'+fm(c.saves||0)+'</div><div class="muted" style="font-size:.62rem">收藏/转发</div></div>'+
-      '<div class="center"><div style="font-weight:700">'+(c.fans?'+'+fm(c.fans):'0')+'</div><div class="muted" style="font-size:.62rem">涨粉</div></div></div>';
-    if(er!=null)html+='<div class="muted mt8">互动率 <b class="purple">'+er+'%</b>（点赞+评论+收藏 ÷ 播放）</div>';
-    if(c.note)html+='<div class="affirm mt8" style="font-size:.78rem">📝 '+esc(c.note)+'</div>';
-    html+='<div class="mt8">'+
-      '<button class="chip pink'+(c.tag==='hot'?' on':'')+'" onclick="Content.tag(\''+c.id+'\',\'hot\')">🔥 标记爆款</button>'+
-      '<button class="chip'+(c.tag==='bad'?' on':'')+'" onclick="Content.tag(\''+c.id+'\',\'bad\')">📉 数据不佳</button>'+
-      '<button class="chip" onclick="Content.note(\''+c.id+'\')">📝 写复盘</button></div>';
+/* ---- 概览 ---- */
+NoSpend.homeHTML=function(){
+  var s=NS().set,p=nsProg(),a=nsStats(null),mo=nsStats(monthDays(mKey(TODAY())));
+  var streak=nsStreak(),bg=nsBadges(),got=bg.filter(function(b){return b.ok});
+  var html='';
+  if(!s.start){
+    html+='<div class="card pinkbg"><div class="h2">🌱 开始你的一年不消费</div>'+
+      '<div class="muted">先花 1 分钟定好规则：挑战什么时候开始、每月允许几次例外。定好之后，每天想买东西时来这里记一笔就好。</div>'+
+      '<button class="btn btn-p btn-full mt12" onclick="NoSpend.settings()">⚙️ 现在设置挑战规则</button></div>';
+  }else{
+    html+='<div class="card pinkbg"><div class="h2">🛍️ 不消费挑战</div>'+
+      '<div class="row" style="align-items:center;gap:14px">'+
+      ringSVG(p.pct,120,'第'+p.done+'天','共 '+p.total+' 天')+
+      '<div class="grow">'+
+      '<div class="summary-line"><span>🔥 连续零破戒</span><span><b>'+streak+'</b> 天</span></div>'+
+      '<div class="summary-line"><span>💰 累计少花</span><span class="purple">¥'+fm(a.saved)+'</span></div>'+
+      '<div class="summary-line"><span>🙅 忍住 / 🛍️ 买了</span><span>'+a.hold+' / '+a.buy+'</span></div>'+
+      '<div class="summary-line"><span>📅 本月冲动</span><span>'+mo.urge+' 次</span></div>'+
+      '</div></div>'+
+      '<div class="muted mt8">'+(s.start?'起 '+dispD(s.start):'')+(s.end?' · 止 '+dispD(s.end):'')+
+      ' · 还剩 '+Math.max(0,p.total-p.done)+' 天</div></div>';
+  }
+  // 本月核心数字
+  html+='<div class="card"><div class="h2">📅 本月表现</div><div class="grid3">'+
+    '<div class="stat-box"><div class="stat-num purple">'+mo.hold+'</div><div class="muted">忍住（次）</div></div>'+
+    '<div class="stat-box"><div class="stat-num green">'+mo.cool+'</div><div class="muted">冷静期（次）</div></div>'+
+    '<div class="stat-box"><div class="stat-num red">'+mo.buy+'</div><div class="muted">买了（次）</div></div></div>'+
+    '<div class="summary-line mt8"><span>本月少花</span><span class="purple">¥'+fm(mo.saved)+'</span></div>'+
+    '<div class="summary-line"><span>本月例外额度</span><span>已用 '+nsExcUsed()+' / '+(s.excPerMonth||0)+' 次</span></div>'+
+    '<div class="muted mt8">🛡️ 房租、伙食、通勤、工作必需不算破戒，不用记录在这里。</div></div>';
+  // 快速记录
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addUrge()">⚡ 我现在想买东西…（记一次冲动）</button>';
+  // 徽章
+  html+='<div class="card"><div class="h2">🏅 成就徽章 <span class="sub">'+got.length+' / '+bg.length+'</span></div><div style="display:flex;flex-wrap:wrap;gap:8px">';
+  bg.forEach(function(b){
+    html+='<div class="center" style="width:70px;opacity:'+(b.ok?1:.28)+'"><div style="font-size:1.6rem">'+b.e+'</div><div class="muted" style="font-size:.66rem;line-height:1.2">'+b.n+'</div></div>';
+  });
+  html+='</div></div>';
+  html+='<div class="grid2" style="gap:8px">'+
+    '<button class="btn" onclick="NoSpend.settings()">⚙️ 挑战规则</button>'+
+    '<button class="btn" onclick="NoSpend.tab=\'stat\';rerender()">📊 看统计 ›</button></div>';
+  html+='<div class="belief"><div class="bt">✨ 不消费，是为了更自由 ✨</div>我不是在克制自己，我是在把钱和注意力，留给真正重要的事。</div>';
+  return html;
+};
+
+/* ---- 冲动记录 ---- */
+NoSpend.urgeHTML=function(){
+  var list=(NS().urge||[]).slice().sort(function(a,b){return a.date<b.date?1:-1});
+  var mo=nsStats(monthDays(mKey(TODAY())));
+  var html='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addUrge()">⚡ 记一次冲动</button>';
+  html+='<div class="card pinkbg"><div class="h2">📅 本月冲动记录</div>'+
+    '<div class="summary-line"><span>冲动次数</span><span>'+mo.urge+' 次</span></div>'+
+    '<div class="summary-line"><span>忍住率</span><span>'+(mo.urge?Math.round(mo.rate*100):0)+'%</span></div>'+
+    '<div class="summary-line"><span>少花 / 花掉</span><span>¥'+fm(mo.saved)+' / ¥'+fm(mo.spent)+'</span></div></div>';
+  if(!list.length){
+    html+='<div class="card"><div class="empty">还没有记录～想买东西的时候点上面按钮，3秒记一笔 🌿</div></div>';
+    return html;
+  }
+  list.forEach(function(u){
+    var rTxt=u.res==='hold'?'🙅 忍住了':u.res==='cool'?'⏳ 冷静期':'🛍️ 买了';
+    var col=u.res==='hold'?'green':u.res==='cool'?'purple':'red';
+    html+='<div class="card"><div class="h2">'+dispD(u.date)+' <span class="sub">'+rTxt+'</span></div>'+
+      '<div class="row"><b class="grow">'+esc(u.item||'没写是什么')+'</b><b class="'+col+'">¥'+fm(u.amt)+'</b></div>'+
+      '<div class="muted mt8">'+(u.emo||'')+' 冲动强度 '+(u.inten||0)+'/5'+(u.trig?' · 触发：'+esc(u.trig):'')+'</div>'+
+      (u.why?'<div class="mt8">原因：'+esc(u.why)+'</div>':'')+
+      (u.after?'<div class="muted mt8">买后感受：'+esc(u.after)+'</div>':'')+
+      (u.exc?'<div class="muted mt8">🎟️ 使用了本月例外额度</div>':'')+
+      '<div class="row mt8">'+
+      (u.res==='buy'?'<button class="btn btn-sm" onclick="NoSpend.addAfter(\''+u.id+'\')">✍️ 补写买后感受</button>':'')+
+      '<button class="btn btn-sm" style="margin-left:auto;color:var(--red)" onclick="NoSpend.del(\'urge\',\''+u.id+'\')">删除</button></div></div>';
+  });
+  return html;
+};
+NoSpend.addUrge=function(){
+  NoSpend.form={emo:'',inten:0,trig:'',res:'hold',exc:false};
+  var trs=(NS().trig||[]).map(function(t){return t.name});
+  var html='<div class="h2">⚡ 记一次冲动</div>'+
+    '<label class="fl">想要什么</label><input class="input" id="nuItem" placeholder="如：一条连衣裙">'+
+    '<label class="fl">大概多少钱</label><input class="input" type="number" id="nuAmt" placeholder="299">'+
+    '<label class="fl">现在的情绪</label><div id="nuEmo">';
+  NS_EMO.forEach(function(e){html+='<button class="chip" onclick="NoSpend.pick(\'emo\',\''+e+'\',this)">'+e+'</button>'});
+  html+='</div><label class="fl">冲动强度（1-5）</label><div id="nuInten">';
+  [1,2,3,4,5].forEach(function(i){html+='<button class="chip" onclick="NoSpend.pick(\'inten\','+i+',this)">'+i+'</button>'});
+  html+='</div><label class="fl">触发源（选填）</label><div id="nuTrig">';
+  trs.forEach(function(t){html+='<button class="chip" onclick="NoSpend.pick(\'trig\',\''+t+'\',this)">'+esc(t)+'</button>'});
+  html+='</div><label class="fl">最后的结果</label><div id="nuRes">';
+  NS_RES.forEach(function(r){html+='<button class="chip'+(r[0]==='hold'?' on':'')+'" onclick="NoSpend.pick(\'res\',\''+r[0]+'\',this)">'+r[1]+'</button>'});
+  html+='</div><div id="nuExcBox" style="display:none"><label class="fl">这次破例</label><div>'+
+    '<button class="chip" id="nuExc" onclick="NoSpend.toggleExc(this)">🎟️ 使用本月例外额度（剩 '+Math.max(0,(NS().set.excPerMonth||0)-nsExcUsed())+' 次）</button></div></div>'+
+    '<label class="fl">想买的原因 / 当时的念头（选填）</label><input class="input" id="nuWhy" placeholder="如：今天很累，想犒劳自己">'+
+    '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-p grow" onclick="NoSpend.saveUrge()">保存</button></div>';
+  modal(html);
+};
+NoSpend.pick=function(k,v,el){
+  NoSpend.form[k]=v;
+  [].forEach.call(el.parentNode.querySelectorAll('.chip'),function(x){x.classList.remove('on')});
+  el.classList.add('on');
+  if(k==='res'){
+    var box=document.getElementById('nuExcBox');
+    if(box)box.style.display=(v==='buy')?'block':'none';
+  }
+};
+NoSpend.toggleExc=function(el){
+  NoSpend.form.exc=!NoSpend.form.exc;
+  el.classList.toggle('on',NoSpend.form.exc);
+};
+NoSpend.saveUrge=function(){
+  var item=$('#nuItem').value.trim();
+  if(!item){toast('先写一下想要什么哦');return}
+  var f=NoSpend.form;
+  NS().urge.push({id:uid(),date:TODAY(),item:item,amt:+$('#nuAmt').value||0,emo:f.emo,inten:f.inten,
+    trig:f.trig,res:f.res,why:$('#nuWhy').value.trim(),after:'',exc:!!(f.exc&&f.res==='buy')});
+  save();closeModal();rerender();
+  var amt=+$('#nuAmt').value||0;
+  if(f.res==='hold')toast('🙅 忍住了！省下 ¥'+fm(amt)+'，你超棒的');
+  else if(f.res==='cool')toast('⏳ 已加入冷静期，30天后再问问自己');
+  else toast('🌿 买了也没关系，记下来就好，明天重新开始');
+};
+NoSpend.addAfter=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  modal('<div class="h2">✍️ 买后感受</div><div class="muted">买完感觉如何？值得吗？</div>'+
+    '<textarea class="ta" id="naTxt">'+esc(u.after||'')+'</textarea>'+
+    '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-p grow" onclick="NoSpend.saveAfter(\''+id+'\')">保存</button></div>');
+};
+NoSpend.saveAfter=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  u.after=$('#naTxt').value.trim();save();closeModal();rerender();toast('已记录 🌿');
+};
+
+/* ---- 清单（必买/禁买/诱惑源） ---- */
+NoSpend.listHTML=function(){
+  var lt=NoSpend.lt;
+  var html='<div class="subtabs">'+
+    '<button class="'+(lt==='buy'?'on':'')+'" onclick="NoSpend.lt=\'buy\';rerender()">📝 必买+冷静期</button>'+
+    '<button class="'+(lt==='ban'?'on':'')+'" onclick="NoSpend.lt=\'ban\';rerender()">🚫 禁买红线</button>'+
+    '<button class="'+(lt==='trig'?'on':'')+'" onclick="NoSpend.lt=\'trig\';rerender()">🎯 诱惑源</button></div>';
+  return html+(lt==='buy'?NoSpend.buyHTML():lt==='ban'?NoSpend.banHTML():NoSpend.trigHTML());
+};
+NoSpend.buyHTML=function(){
+  var list=NS().buy||[];
+  var html='<div class="muted" style="margin-bottom:8px">想买的东西先躺 '+NS_COOL+' 天。到期再问自己：我还需要它吗？大多数答案会变成"不要了"。</div>'+
+    '<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addBuy()">＋ 加入必买清单</button>';
+  if(!list.length)return html+'<div class="card"><div class="empty">清单是空的，很好 🌿</div></div>';
+  list.forEach(function(b){
+    var waited=daysDiff(b.added,TODAY());
+    var left=NS_COOL-waited;
+    var st=b.status==='bought'?'✅ 已买':b.status==='drop'?'🌿 已放弃':(left>0?'⏳ 冷静期还剩 '+left+' 天':'✅ 冷静期已过');
+    html+='<div class="card"><div class="h2">'+esc(b.item)+' <span class="sub">'+st+'</span></div>'+
+      '<div class="muted">理由：'+esc(b.reason||'—')+'</div>'+
+      '<div class="summary-line mt8"><span>预算</span><span>¥'+fm(b.budget)+'</span></div>'+
+      '<div class="summary-line"><span>最晚购买日</span><span>'+(b.deadline||'不限')+'</span></div>'+
+      '<div class="muted mt8">已等待 '+waited+' 天</div>'+
+      (b.status==='wait'?'<div class="row mt8">'+
+        '<button class="btn btn-sm" onclick="NoSpend.buyDone(\''+b.id+'\',\'bought\')">买了吧</button>'+
+        '<button class="btn btn-sm" onclick="NoSpend.buyDone(\''+b.id+'\',\'drop\')">不要了</button>'+
+        '<button class="btn btn-sm" style="margin-left:auto;color:var(--red)" onclick="NoSpend.del(\'buy\',\''+b.id+'\')">删除</button></div>':
+        '<button class="btn btn-sm mt8" style="color:var(--red)" onclick="NoSpend.del(\'buy\',\''+b.id+'\')">删除</button>')+
+      '</div>';
+  });
+  return html;
+};
+NoSpend.addBuy=function(){
+  modal('<div class="h2">📝 加入必买清单</div>'+
+    '<label class="fl">想买什么</label><input class="input" id="nbItem" placeholder="如：跑鞋">'+
+    '<label class="fl">为什么真的需要</label><input class="input" id="nbWhy" placeholder="旧的已经磨破了">'+
+    '<label class="fl">预算（元）</label><input class="input" type="number" id="nbBud" placeholder="500">'+
+    '<label class="fl">最晚什么时候必须买</label><input class="input" type="date" id="nbDl">'+
+    '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-p grow" onclick="NoSpend.saveBuy()">加入</button></div>');
+};
+NoSpend.saveBuy=function(){
+  var v=$('#nbItem').value.trim();
+  if(!v){toast('先写下想买什么');return}
+  NS().buy.push({id:uid(),item:v,reason:$('#nbWhy').value.trim(),budget:+$('#nbBud').value||0,
+    deadline:$('#nbDl').value,added:TODAY(),status:'wait'});
+  save();closeModal();rerender();toast('⏳ 已加入，先躺 '+NS_COOL+' 天');
+};
+NoSpend.buyDone=function(id,st){
+  var b=(NS().buy||[]).find(function(x){return x.id===id});if(!b)return;
+  b.status=st;save();rerender();
+  toast(st==='bought'?'✅ 买吧，这是计划内的':'🌿 又省下一笔，真好');
+};
+NoSpend.banHTML=function(){
+  var list=NS().ban||[],used=nsExcUsed(),per=NS().set.excPerMonth||0;
+  var html='<div class="card pinkbg"><div class="h2">🎟️ 本月例外额度</div>'+
+    '<div class="row"><b class="grow">已用 '+used+' / '+per+' 次</b>'+
+    '<button class="btn btn-sm" onclick="NoSpend.settings()">改额度</button></div>'+
+    '<div class="muted mt8">计划内的破例不算失败，但要用得明明白白。</div></div>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addBan()">＋ 加一条红线</button>';
+  if(!list.length)return html+'<div class="card"><div class="empty">还没有红线，加几条吧</div></div>';
+  list.forEach(function(b){
+    html+='<div class="li"><div class="emoji">🚫</div><div class="grow"><div class="name">'+esc(b.name)+'</div>'+
+      (b.note?'<div class="desc">'+esc(b.note)+'</div>':'')+'</div>'+
+      '<button class="del-x" onclick="NoSpend.del(\'ban\',\''+b.id+'\')">✕</button></div>';
+  });
+  return html;
+};
+NoSpend.addBan=function(){
+  var v=prompt('要禁止买什么？（如：快时尚服饰）');
+  if(!v||!v.trim())return;
+  var n=prompt('备注（选填，如：再便宜也不买）','')||'';
+  NS().ban.push({id:uid(),name:v.trim(),note:n.trim()});save();rerender();toast('🚫 已加入红线');
+};
+NoSpend.trigHTML=function(){
+  var list=NS().trig||[],days=monthDays(mKey(TODAY())),us=NS().urge||[];
+  var html='<div class="muted" style="margin-bottom:8px">识别让你想花钱的场景和情绪，提前想好应对办法。</div>'+
+    '<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addTrig()">＋ 加一个诱惑源</button>';
+  if(!list.length)return html+'<div class="card"><div class="empty">还没有记录</div></div>';
+  list.forEach(function(t){
+    var n=us.filter(function(u){return u.trig===t.name&&days.indexOf(u.date)>=0}).length;
+    var col=t.level==='高'?'red':t.level==='中'?'purple':'green';
+    html+='<div class="card"><div class="h2">'+esc(t.name)+' <span class="sub">危险等级 <b class="'+col+'">'+esc(t.level)+'</b></span></div>'+
+      '<div class="muted">本月触发 '+n+' 次</div>'+
+      (t.strategy?'<div class="mt8">应对策略：'+esc(t.strategy)+'</div>':'')+
+      '<button class="btn btn-sm mt8" style="color:var(--red)" onclick="NoSpend.del(\'trig\',\''+t.id+'\')">删除</button></div>';
+  });
+  return html;
+};
+NoSpend.addTrig=function(){
+  var v=prompt('什么会让你想花钱？（如：直播间、情绪低落）');
+  if(!v||!v.trim())return;
+  var lv=prompt('危险等级：高 / 中 / 低','中')||'中';
+  if(['高','中','低'].indexOf(lv)<0)lv='中';
+  var st=prompt('应对办法（如：先退出，加入冷静期）','')||'';
+  NS().trig.push({id:uid(),name:v.trim(),level:lv,strategy:st.trim()});save();rerender();toast('🎯 已记录');
+};
+
+/* ---- 物品清点 ---- */
+NoSpend.invHTML=function(){
+  var list=NS().inv||[];
+  var qty=sum(list.map(function(i){return i.qty})),idle=sum(list.map(function(i){return i.idle}));
+  var val=sum(list.map(function(i){return i.value}));
+  var cats=[];list.forEach(function(i){if(cats.indexOf(i.cat)<0)cats.push(i.cat)});
+  var html='<div class="muted" style="margin-bottom:8px">分批清点就好，不用一次做完。每清一类，你就越清楚"我已经拥有很多了"。</div>';
+  html+='<div class="card pinkbg"><div class="h2">📦 清点进度</div>'+
+    '<div class="summary-line"><span>已清类别</span><span>'+cats.length+' / '+NS_INV_CATS.length+'</span></div>'+
+    '<div class="summary-line"><span>物品总件数</span><span>'+qty+' 件</span></div>'+
+    '<div class="summary-line"><span>其中闲置</span><span>'+idle+' 件'+(qty?'（'+Math.round(idle/qty*100)+'%）':'')+'</span></div>'+
+    '<div class="summary-line"><span>估值合计（选填）</span><span>¥'+fm(val)+'</span></div>'+
+    '<div class="muted mt8">'+(idle>0?'有 '+idle+' 件在吃灰——这就是不买新东西最好的理由 🌿':'清点完你会惊讶自己已经拥有这么多')+'</div></div>';
+  html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addInv()">＋ 添加物品</button>';
+  if(!list.length)return html+'<div class="card"><div class="empty">还没有清点记录</div></div>';
+  NS_INV_CATS.forEach(function(c){
+    var sub=list.filter(function(i){return i.cat===c});
+    if(!sub.length)return;
+    html+='<div class="card"><div class="h2">'+c+' <span class="sub">'+sum(sub.map(function(i){return i.qty}))+' 件</span></div>';
+    sub.forEach(function(i){
+      html+='<div class="li"><div class="emoji">'+(i.idle>0?'💤':'📦')+'</div><div class="grow">'+
+        '<div class="name">'+esc(i.name)+' ×'+(i.qty||0)+(i.idle>0?' <span class="muted">（闲置 '+i.idle+'）</span>':'')+'</div>'+
+        (i.value?'<div class="desc">估值 ¥'+fm(i.value)+'</div>':'')+'</div>'+
+        '<button class="del-x" onclick="NoSpend.del(\'inv\',\''+i.id+'\')">✕</button></div>';
+    });
     html+='</div>';
   });
   return html;
 };
-Content.edit=function(id){
-  var c=id?DB.content.find(function(x){return x.id===id}):null;
-  var html='<div class="h2">'+(c?'编辑内容':'记录发布内容')+'</div>'+
-    '<label class="fl">发布日期</label><input class="input" type="date" id="cDate" value="'+(c?c.date:TODAY())+'">'+
-    '<label class="fl">平台</label><div id="cPlat">';
-  PLATFORMS.forEach(function(p){html+='<button class="chip pink'+((c?c.platform:PLATFORMS[0])===p?' on':'')+'" data-v="'+p+'" onclick="Content.pick(this,\'cPlat\')">'+p+'</button>'});
-  html+='</div><label class="fl">内容标题</label><input class="input" id="cTitle" value="'+esc(c?c.title:'')+'" placeholder="标题或主题">'+
-    '<label class="fl">内容类型</label><div id="cType">';
-  CTYPES.forEach(function(t){html+='<button class="chip'+((c?c.type:CTYPES[0])===t?' on':'')+'" data-v="'+t+'" onclick="Content.pick(this,\'cType\')">'+t+'</button>'});
-  html+='</div><label class="fl">发布时间（选填）</label><input class="input" type="time" id="cTime" value="'+esc(c?c.time||'':'')+'">'+
-    '<div class="h2" style="margin-top:14px">📊 数据（随时可回来更新）</div><div class="grid2">'+
-    '<div><label class="fl">播放/阅读</label><input class="input" type="number" id="cViews" value="'+(c?c.views||'':'')+'"></div>'+
-    '<div><label class="fl">点赞</label><input class="input" type="number" id="cLikes" value="'+(c?c.likes||'':'')+'"></div>'+
-    '<div><label class="fl">评论</label><input class="input" type="number" id="cComments" value="'+(c?c.comments||'':'')+'"></div>'+
-    '<div><label class="fl">收藏/转发</label><input class="input" type="number" id="cSaves" value="'+(c?c.saves||'':'')+'"></div>'+
-    '<div><label class="fl">涨粉</label><input class="input" type="number" id="cFans" value="'+(c?c.fans||'':'')+'"></div></div>'+
-    '<div class="row mt12">'+
-    (c?'<button class="btn" style="color:var(--red)" onclick="Content.del(\''+c.id+'\')">删除</button>':'')+
-    '<button class="btn grow" onclick="closeModal()">取消</button>'+
-    '<button class="btn btn-p grow" onclick="Content.save(\''+(id||'')+'\')">保存</button></div>';
-  modal(html);
-};
-Content.pick=function(el,box){document.querySelectorAll('#'+box+' .chip').forEach(function(x){x.classList.remove('on')});el.classList.add('on')};
-Content.save=function(id){
-  var title=$('#cTitle').value.trim();
-  if(!title){toast('给内容起个标题吧');return}
-  var get=function(box){var e=document.querySelector('#'+box+' .chip.on');return e?e.dataset.v:''};
-  var rec={
-    id:id||uid(),date:$('#cDate').value||TODAY(),platform:get('cPlat'),title:title,type:get('cType'),time:$('#cTime').value,
-    views:+$('#cViews').value||0,likes:+$('#cLikes').value||0,comments:+$('#cComments').value||0,saves:+$('#cSaves').value||0,fans:+$('#cFans').value||0
-  };
-  if(id){
-    var old=DB.content.find(function(x){return x.id===id});
-    rec.tag=old.tag;rec.note=old.note;
-    DB.content=DB.content.map(function(x){return x.id===id?rec:x});
-  }else DB.content.push(rec);
-  save();closeModal();rerender();toast('📱 已记录！期待它起飞 🚀');
-};
-Content.del=function(id){
-  if(!confirm('确定删除这条内容记录？'))return;
-  DB.content=DB.content.filter(function(x){return x.id!==id});
-  save();closeModal();rerender();
-};
-Content.tag=function(id,tag){
-  var c=DB.content.find(function(x){return x.id===id});
-  c.tag=c.tag===tag?'':tag;
-  save();rerender();
-  if(c.tag==='hot')Content.note(id);
-};
-Content.note=function(id){
-  var c=DB.content.find(function(x){return x.id===id});
-  modal('<div class="h2">📝 复盘笔记</div><div class="muted" style="margin-bottom:8px">'+esc(c.title)+'</div>'+
-    '<textarea class="ta" id="cNote" style="min-height:110px" placeholder="为什么这条火了/没火？做对了什么？下次怎么做？">'+esc(c.note||'')+'</textarea>'+
+NoSpend.addInv=function(){
+  var opts=NS_INV_CATS.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('');
+  modal('<div class="h2">📦 添加物品</div>'+
+    '<label class="fl">名称</label><input class="input" id="niName" placeholder="如：黑色连衣裙">'+
+    '<label class="fl">分类</label><select class="input" id="niCat">'+opts+'</select>'+
+    '<div class="grid2"><div><label class="fl">数量</label><input class="input" type="number" id="niQty" value="1"></div>'+
+    '<div><label class="fl">其中闲置</label><input class="input" type="number" id="niIdle" value="0"></div></div>'+
+    '<label class="fl">估值（元，选填）</label><input class="input" type="number" id="niVal" placeholder="不填就留空">'+
     '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
-    '<button class="btn btn-p grow" onclick="Content.saveNote(\''+id+'\')">保存</button></div>');
+    '<button class="btn btn-p grow" onclick="NoSpend.saveInv()">添加</button></div>');
 };
-Content.saveNote=function(id){
-  var c=DB.content.find(function(x){return x.id===id});
-  c.note=$('#cNote').value.trim();
-  save();closeModal();rerender();
+NoSpend.saveInv=function(){
+  var v=$('#niName').value.trim();
+  if(!v){toast('先写下物品名称');return}
+  NS().inv.push({id:uid(),cat:$('#niCat').value,name:v,qty:+$('#niQty').value||0,
+    idle:+$('#niIdle').value||0,value:+$('#niVal').value||0});
+  save();closeModal();rerender();toast('📦 已记录');
 };
 
-Content.statHTML=function(){
-  var mk=mKey(TODAY()),mo=contentOfMonth(mk);
-  var wk=weekDays(TODAY());
-  var wCount=DB.content.filter(function(c){return wk.indexOf(c.date)>=0}).length;
-  var totalViews=sum(mo.map(function(c){return c.views})),totalFans=sum(mo.map(function(c){return c.fans}));
-  var html='<div class="grid2">'+
-    '<div class="card center"><div class="stat-num pink">'+wCount+'</div><div class="muted">本周发布</div></div>'+
-    '<div class="card center"><div class="stat-num purple">'+mo.length+'</div><div class="muted">本月发布</div></div></div>';
-  html+='<div class="grid2">'+
-    '<div class="card center"><div class="stat-num">'+fm(totalViews)+'</div><div class="muted">本月总播放</div></div>'+
-    '<div class="card center"><div class="stat-num red">+'+fm(totalFans)+'</div><div class="muted">本月涨粉</div></div></div>';
-  // 平台分布
-  var byP={};
-  mo.forEach(function(c){byP[c.platform]=(byP[c.platform]||0)+1});
-  html+='<div class="card"><div class="h2">🥧 各平台发布分布（本月）</div>'+donutChart(Object.keys(byP).map(function(p){return {l:p,v:byP[p]}}))+'</div>';
-  // 播放TOP3
-  var top=mo.slice().sort(function(a,b){return (b.views||0)-(a.views||0)}).slice(0,3);
-  html+='<div class="card"><div class="h2">🏆 本月播放 TOP3</div>';
-  if(top.length&&top[0].views){
-    top.forEach(function(c,i){
-      html+='<div class="li"><div class="emoji">'+['🥇','🥈','🥉'][i]+'</div><div class="grow"><div class="name">'+esc(c.title)+'</div><div class="desc">'+esc(c.platform)+' · 播放 '+fm(c.views||0)+' · 互动率 '+(engageRate(c)!=null?engageRate(c)+'%':'--')+'</div></div></div>';
-    });
-  }else html+='<div class="empty">更新内容数据后自动排名</div>';
-  html+='</div>';
-  // 爆款
-  var hots=DB.content.filter(function(c){return c.tag==='hot'});
-  html+='<div class="card"><div class="h2">🔥 爆款合集 <span class="sub">共'+hots.length+'条</span></div>';
-  if(hots.length){
-    hots.slice().reverse().slice(0,5).forEach(function(c){
-      html+='<div class="summary-line"><span>'+esc(c.title)+'</span><span>'+fm(c.views||0)+'播放</span></div>';
-      if(c.note)html+='<div class="muted" style="padding-bottom:6px">💡 '+esc(c.note)+'</div>';
-    });
-  }else html+='<div class="empty">第一条爆款正在路上 ✨</div>';
-  html+='</div>';
+/* ---- 储蓄罐 ---- */
+NoSpend.jarHTML=function(){
+  var list=NS().jar||[],total=sum(list.map(function(j){return j.saved}));
+  var a=nsStats(null);
+  var html='<div class="card pinkbg"><div class="h2">🫙 忍住的钱去哪了</div>'+
+    '<div class="summary-line"><span>累计忍住少花</span><span class="purple">¥'+fm(a.saved)+'</span></div>'+
+    '<div class="summary-line"><span>已存进罐子</span><span class="green">¥'+fm(total)+'</span></div>'+
+    '<div class="muted mt8">钱没花掉，就真的留在你手里了。存一笔，看着它长大 ✨</div></div>';
+  if(!list.length)return html+'<div class="card"><div class="empty">还没有储蓄罐</div></div>';
+  list.forEach(function(j){
+    var pct=j.target?Math.min(100,j.saved/j.target*100):0;
+    html+='<div class="card"><div class="h2">🫙 '+esc(j.name)+'</div>'+
+      '<div class="row"><b class="grow">¥'+fm(j.saved)+' / ¥'+fm(j.target)+'</b><b class="purple">'+Math.round(pct)+'%</b></div>'+
+      '<div class="prog mt8"><i style="width:'+pct+'%"></i></div>'+
+      '<div class="row mt8"><button class="btn btn-sm" onclick="NoSpend.jarIn(\''+j.id+'\')">💰 存一笔</button>'+
+      '<button class="btn btn-sm" onclick="NoSpend.jarTarget(\''+j.id+'\')">🎯 改目标</button>'+
+      '<button class="btn btn-sm" style="margin-left:auto;color:var(--red)" onclick="NoSpend.del(\'jar\',\''+j.id+'\')">删除</button></div></div>';
+  });
+  html+='<button class="btn btn-full" onclick="NoSpend.addJar()">＋ 新建一个储蓄罐</button>';
   return html;
+};
+NoSpend.addJar=function(){
+  var v=prompt('罐子名字（如：还贷基金 / 留学基金）');
+  if(!v||!v.trim())return;
+  var t=prompt('目标金额（元）','10000');
+  NS().jar.push({id:uid(),name:v.trim(),target:+t||0,saved:0});save();rerender();toast('🫙 新罐子已建好');
+};
+NoSpend.jarIn=function(id){
+  var j=(NS().jar||[]).find(function(x){return x.id===id});if(!j)return;
+  var v=prompt('存多少钱进「'+j.name+'」？（元）','');
+  if(v==null)return;
+  var n=+v;if(!n||n<=0){toast('请输入金额');return}
+  j.saved=(+j.saved||0)+n;save();rerender();toast('🫙 存入 ¥'+fm(n)+'，离目标更近了');
+};
+NoSpend.jarTarget=function(id){
+  var j=(NS().jar||[]).find(function(x){return x.id===id});if(!j)return;
+  var v=prompt('「'+j.name+'」的目标金额（元）',j.target);
+  if(v!=null&&+v>=0){j.target=+v;save();rerender()}
+};
+
+/* ---- 统计 ---- */
+NoSpend.statHTML=function(){
+  var a=nsStats(null),streak=nsStreak(),bg=nsBadges();
+  var ms=nsMonths(6);
+  var rateItems=ms.map(function(m){
+    var s=nsStats(monthDays(m));
+    return {l:m.slice(5)+'月',v:s.urge?Math.round(s.rate*100):null};
+  });
+  var amtItems=ms.map(function(m){
+    var s=nsStats(monthDays(m));
+    return {l:m.slice(5)+'月',v:s.saved};
+  });
+  var html='<div class="card pinkbg"><div class="h2">📊 挑战总览</div>'+
+    '<div class="grid3">'+
+    '<div class="stat-box"><div class="stat-num purple">'+a.urge+'</div><div class="muted">冲动（次）</div></div>'+
+    '<div class="stat-box"><div class="stat-num green">'+a.hold+'</div><div class="muted">忍住（次）</div></div>'+
+    '<div class="stat-box"><div class="stat-num red">'+a.buy+'</div><div class="muted">买了（次）</div></div></div>'+
+    '<div class="summary-line mt8"><span>忍住率</span><span>'+(a.urge?Math.round(a.rate*100):0)+'%</span></div>'+
+    '<div class="summary-line"><span>累计少花 / 花掉</span><span>¥'+fm(a.saved)+' / ¥'+fm(a.spent)+'</span></div>'+
+    '<div class="summary-line"><span>最长连续零破戒</span><span>'+streak+' 天</span></div></div>';
+  html+='<div class="card"><div class="h2">📈 忍住率趋势（近6个月，%）</div>'+lineChart(rateItems,{c:'#8FCBB4'})+'</div>';
+  html+='<div class="card"><div class="h2">💰 每月少花（近6个月，元）</div>'+barChart(amtItems,{c1:'#B79CE0',showVal:true})+'</div>';
+  // 触发源分布
+  var byTrig={};(NS().urge||[]).forEach(function(u){var k=u.trig||'未注明';byTrig[k]=(byTrig[k]||0)+1});
+  var keys=Object.keys(byTrig);
+  if(keys.length)html+='<div class="card"><div class="h2">🎯 冲动触发源分布</div>'+donutChart(keys.map(function(k){return {l:k,v:byTrig[k]}}))+'</div>';
+  // 徽章墙
+  html+='<div class="card"><div class="h2">🏅 徽章墙</div><div style="display:flex;flex-wrap:wrap;gap:10px">';
+  bg.forEach(function(b){
+    html+='<div class="center" style="width:76px;padding:8px 2px;border-radius:12px;background:'+(b.ok?'#F3F0F8':'#FAF7F9')+';opacity:'+(b.ok?1:.35)+'">'+
+      '<div style="font-size:1.7rem">'+b.e+'</div><div class="muted" style="font-size:.66rem;line-height:1.25">'+b.n+'</div></div>';
+  });
+  html+='</div></div>';
+  return html;
+};
+
+/* ---- 通用 ---- */
+NoSpend.del=function(kind,id){
+  var n=NS();
+  if(kind==='urge')n.urge=n.urge.filter(function(x){return x.id!==id});
+  else if(kind==='buy')n.buy=n.buy.filter(function(x){return x.id!==id});
+  else if(kind==='ban')n.ban=n.ban.filter(function(x){return x.id!==id});
+  else if(kind==='trig')n.trig=n.trig.filter(function(x){return x.id!==id});
+  else if(kind==='inv')n.inv=n.inv.filter(function(x){return x.id!==id});
+  else if(kind==='jar')n.jar=n.jar.filter(function(x){return x.id!==id});
+  save();rerender();
+};
+NoSpend.settings=function(){
+  var s=NS().set;
+  modal('<div class="h2">⚙️ 挑战规则</div>'+
+    '<label class="fl">开始日期</label><input class="input" type="date" id="nsStart" value="'+esc(s.start||'')+'">'+
+    '<label class="fl">结束日期（默认一年后）</label><input class="input" type="date" id="nsEnd" value="'+esc(s.end||'')+'">'+
+    '<label class="fl">每月例外次数（计划内破例额度）</label><input class="input" type="number" id="nsExc" value="'+(s.excPerMonth||0)+'">'+
+    '<div class="muted mt8">🛡️ 房租、伙食、通勤、工作必需开销不算破戒，不需要记录。</div>'+
+    '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-p grow" onclick="NoSpend.saveSet()">保存</button></div>');
+};
+NoSpend.saveSet=function(){
+  var s=NS().set;
+  s.start=$('#nsStart').value;
+  s.end=$('#nsEnd').value;
+  s.excPerMonth=Math.max(0,+$('#nsExc').value||0);
+  if(s.start&&!s.end)s.end=addD(s.start,364);
+  save();closeModal();rerender();toast('⚙️ 规则已保存，开始了就别停哦');
 };
 
 </script>
@@ -1990,7 +2349,6 @@ Review.dayHTML=function(){
   var hp=habitProgress(d),pp=planProgress(d),m=dayMoney(d);
   var sMin=studyMins([d]),sList=studyOf(d);
   var sl=sleepOf(d),mood=DB.mood[d]||'—';
-  var posts=DB.content.filter(function(c){return c.date===d});
   var html='<div class="datebar"><button onclick="Review.dDate=addD(Review.dDate,-1);rerender()">‹</button><b>'+dispD(d)+(d===TODAY()?' · 今天':'')+'</b><button onclick="Review.dDate=addD(Review.dDate,1);rerender()">›</button></div>';
   html+='<div class="card pinkbg"><div class="h2">✨ 今天的你，做了这么多事</div>'+
     '<div class="summary-line"><span>✅ 习惯完成</span><span>'+hp.done+' / '+hp.total+' 个</span></div>'+
@@ -2002,8 +2360,7 @@ Review.dayHTML=function(){
     '<div class="summary-line"><span>💧 喝水</span><span>'+waterOf(d)+' / '+DB.settings.waterGoal+' ml</span></div>'+
     '<div class="summary-line"><span>😴 睡眠</span><span>'+(sl.h!=null?sl.h+'小时 · '+(sl.q||''):'—')+'</span></div>'+
     '<div class="summary-line"><span>心情</span><span style="font-size:1.1rem">'+mood+'</span></div>'+
-    '<div class="summary-line"><span>📱 发布内容</span><span>'+(posts.length?posts.length+' 条':'—')+'</span></div>'+
-    (posts.length?'<div class="muted" style="padding:2px 0">'+posts.map(function(c){return esc(c.platform)+'《'+esc(c.title)+'》'}).join('、')+'</div>':'')+
+    '<div class="summary-line"><span>🛍️ 不消费</span><span>'+nsSummary([d])+'</span></div>'+
     '</div>';
   html+='<div class="card"><div class="h2">🙏 今天做得好的3件事（感恩日记）</div>';
   for(var i=0;i<3;i++){
@@ -2048,8 +2405,6 @@ Review.weekHTML=function(){
   var sMin=studyMins(days);
   var byCat={};days.forEach(function(d){studyOf(d).forEach(function(e){byCat[e.cat]=(byCat[e.cat]||0)+(+e.min||0)})});
   var moods=days.map(function(d){return DB.mood[d]||'⬜'}).join(' ');
-  var posts=DB.content.filter(function(c){return days.indexOf(c.date)>=0});
-  var pv=sum(posts.map(function(c){return c.views}));
   var slps=passed.map(function(d){return sleepOf(d).h}).filter(function(h){return h!=null});
   var avgSleep=slps.length?Math.round(sum(slps)/slps.length*10)/10:null;
   var wta=timeAgg(days);
@@ -2059,7 +2414,7 @@ Review.weekHTML=function(){
     '<div class="summary-line"><span>💰 总收入 / 总支出</span><span><span class="red">+'+fm(inc)+'</span> / −'+fm(exp)+'</span></div>'+
     '<div class="summary-line"><span>结余</span><span>'+fm(inc-exp)+' 元</span></div>'+
     '<div class="summary-line"><span>📖 学习总时长</span><span>'+(sMin?fmtMin(sMin):'—')+'</span></div>'+
-    '<div class="summary-line"><span>📱 发布内容 / 总播放</span><span>'+posts.length+' 条 / '+fm(pv)+'</span></div>'+
+    '<div class="summary-line"><span>🛍️ 不消费</span><span>'+nsSummary(days)+'</span></div>'+
     '<div class="summary-line"><span>😴 平均睡眠</span><span>'+(avgSleep!=null?avgSleep+' 小时':'—')+'</span></div>'+
     '<div class="mt8"><div class="muted">本周心情走势</div><div style="font-size:1.3rem;letter-spacing:4px;margin-top:4px">'+moods+'</div></div>'+
     (wta.total?'<div class="summary-line mt8"><span>⏱️ 本周时间</span><span>'+wta.total.toFixed(1)+' 小时</span></div><div class="muted">工作 '+wta.g.work.toFixed(1)+'h · 生活 '+wta.g.life.toFixed(1)+'h · 成长 '+wta.g.growth.toFixed(1)+'h · 休闲 '+wta.g.leisure.toFixed(1)+'h（日均 '+(wta.total/passed.length).toFixed(1)+'h）</div>':'')+
@@ -2119,8 +2474,6 @@ Review.monthHTML=function(){
     var e=DB.mood[d];if(!e)return;
     if(MOOD_GOOD.indexOf(e)>=0)mg++;else if(MOOD_BAD.indexOf(e)>=0)mb++;else mmid++;
   });
-  var posts=DB.content.filter(function(c){return mKey(c.date)===mk});
-  var pv=sum(posts.map(function(c){return c.views}));
   // 体重变化
   var wRecs=Object.keys(DB.body.week).filter(function(ws){return mKey(ws)===mk&&DB.body.week[ws].weight}).sort();
   var wChange='';
@@ -2145,7 +2498,7 @@ Review.monthHTML=function(){
     '<div class="summary-line"><span>✅ 习惯总完成率</span><span>'+(hTotal?Math.round(hDone/hTotal*100):0)+'%</span></div>'+
     '<div class="summary-line"><span>📅 总打卡天数</span><span>'+punchDays+' 天</span></div>'+
     '<div class="summary-line"><span>心情统计</span><span>😊'+mg+'天 😐'+mmid+'天 😢'+mb+'天</span></div>'+
-    '<div class="summary-line"><span>📱 发布 / 总播放</span><span>'+posts.length+' 条 / '+fm(pv)+'</span></div>'+
+    '<div class="summary-line"><span>🛍️ 不消费</span><span>'+nsSummary(days)+'</span></div>'+
     (wChange?'<div class="summary-line"><span>⚖️ 体重变化</span><span>'+wChange+'</span></div>':'')+
     '<div class="summary-line"><span>🏦 还款进度</span><span>已还'+fm(repaid)+' · 剩'+fm(M.debtLeft)+'</span></div>'+
     (mta.total?'<div class="summary-line"><span>⏱️ 本月时间</span><span>'+mta.total.toFixed(1)+' 小时</span></div><div class="muted">工作 '+mta.g.work.toFixed(1)+'h · 生活 '+mta.g.life.toFixed(1)+'h · 成长 '+mta.g.growth.toFixed(1)+'h · 休闲 '+mta.g.leisure.toFixed(1)+'h（日均 '+(mta.total/passed.length).toFixed(1)+'h）</div>':'')+
@@ -2483,7 +2836,7 @@ Growth.miracleHTML=function(){
   if(!keys.length)html+='<div class="empty">还没有记录，今天留意一下 ✨</div>';
   keys.forEach(function(k){
     DB.miracle[k].forEach(function(t,i){
-      html+='<div class="li"><div class="emoji">✨</div><div class="grow"><div class="name">'+esc(t)+'</div><div class="desc muted">'+dispD(k)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentMiracle(\''+k+'\','+i+')">📱转内容</button><button class="del-x" onclick="Growth.delMiracle(\''+k+'\','+i+')">✕</button></div>';
+      html+='<div class="li"><div class="emoji">✨</div><div class="grow"><div class="name">'+esc(t)+'</div><div class="desc muted">'+dispD(k)+'</div></div><button class="del-x" onclick="Growth.delMiracle(\''+k+'\','+i+')">✕</button></div>';
     });
   });
   html+='</div>';
@@ -2579,7 +2932,7 @@ Growth.inspireHTML=function(){
   var list=DB.inspire.slice().reverse();
   if(!list.length)html+='<div class="empty">还没有灵感记录</div>';
   list.forEach(function(it){
-    html+='<div class="li"><div class="emoji">💡</div><div class="grow"><div class="name">'+esc(it.note)+'</div><div class="desc muted">'+dispD(it.date)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentInspire(\''+it.id+'\')">📱转内容</button><button class="del-x" onclick="Growth.delInspire(\''+it.id+'\')">✕</button></div>';
+    html+='<div class="li"><div class="emoji">💡</div><div class="grow"><div class="name">'+esc(it.note)+'</div><div class="desc muted">'+dispD(it.date)+'</div></div><button class="del-x" onclick="Growth.delInspire(\''+it.id+'\')">✕</button></div>';
   });
   html+='</div>';
   return html;
@@ -2599,7 +2952,7 @@ Growth.studentHTML=function(){
   var list=DB.student.slice().reverse();
   if(!list.length)html+='<div class="empty">还没有记录</div>';
   list.forEach(function(it){
-    html+='<div class="li"><div class="emoji" style="background:#B79CE033">🌱</div><div class="grow"><div class="name">'+esc(it.name)+' <span class="muted">'+dispD(it.date)+'</span></div><div class="desc">'+esc(it.story)+'</div></div><button class="btn btn-sm" style="margin-right:6px" onclick="Growth.toContentStudent(\''+it.id+'\')">📱转内容</button><button class="del-x" onclick="Growth.delStudent(\''+it.id+'\')">✕</button></div>';
+    html+='<div class="li"><div class="emoji" style="background:#B79CE033">🌱</div><div class="grow"><div class="name">'+esc(it.name)+' <span class="muted">'+dispD(it.date)+'</span></div><div class="desc">'+esc(it.story)+'</div></div><button class="del-x" onclick="Growth.delStudent(\''+it.id+'\')">✕</button></div>';
   });
   html+='</div>';
   return html;
@@ -2636,16 +2989,6 @@ Growth.copyReport=function(){
   if(t){t.select();try{document.execCommand('copy')}catch(e){}}
   toast('📋 已复制，去发圈吧～');
 };
-/* 素材一键转内容（不覆盖已有内容数据） */
-Growth.toContent=function(title,note){
-  if(!title&&!note)return;
-  DB.content.push({id:uid(),date:TODAY(),platform:'',title:(title||'').slice(0,40),type:'笔记',time:'',views:0,likes:0,comments:0,saves:0,fans:0,tag:'',note:(note||'').slice(0,200)});
-  save();rerender();toast('📱 已转到内容，去补充数据～');
-};
-Growth.toContentMiracle=function(k,i){var t=DB.miracle[k]&&DB.miracle[k][i];if(t)Growth.toContent(t)};
-Growth.toContentInspire=function(id){var it=DB.inspire.find(function(x){return x.id===id});if(it)Growth.toContent(it.note)};
-Growth.toContentStudent=function(id){var it=DB.student.find(function(x){return x.id===id});if(it)Growth.toContent('学员'+it.name+'：'+it.story)};
-Growth.toContentTarot=function(d){var t=DB.tarot[d];if(t)Growth.toContent('塔罗·'+(t.card||''),t.note)};
 
 </script>
 <script>boot();</script>
