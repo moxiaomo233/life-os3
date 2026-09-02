@@ -819,7 +819,7 @@ VIEWS.onestop=function(){
     '<button class="btn btn-sm" onclick="Body.bowelInc(\''+d+'\',-1)">－</button>'+
     '<button class="btn btn-sm" onclick="Body.bowelInc(\''+d+'\',1)">＋</button></div>'+
     '<label class="fl">备注（选填）</label><input class="input" placeholder="如：偏软/偏硬" value="'+esc(bdx.bowelNote||'')+'" onchange="Body.setBowelNote(\''+d+'\',this.value)"></div>';
-  // 时间：工作/学习/运动/娱乐 + 其他，写入时间管理
+  // 时间：工作/学习/兼职/娱乐 + 其他，写入时间管理
   function tRow(label,id,cat,group){
     var min=tMin(cat);
     return '<div class="card"><div class="h2">'+label+' <span class="sub">写入时间管理</span></div>'+
@@ -828,7 +828,7 @@ VIEWS.onestop=function(){
   }
   html+=tRow('💼 工作时长','osWork','工作','work');
   html+=tRow('📖 学习时长','osStudy','学习','growth');
-  html+=tRow('🚗 通勤时长','osEx','通勤','life');
+  html+=tRow('⏰ 兼职时长','osPart','兼职','work');
   html+=tRow('🎮 娱乐时长','osFun','娱乐','leisure');
   html+='<div class="card"><div class="h2">➕ 其他时间（自定义名称）</div>'+
     '<div class="row"><input class="input grow" id="osOtherCat" placeholder="如：通勤/收拾自己">'+
@@ -2681,7 +2681,7 @@ var GROUP=[
   {k:'leisure',label:'🎮 休闲', emoji:'🎮', color:'#F2C879'}
 ];
 var TIME_SEED={
-  work:['健身教练','直播','其他工作'],
+  work:['健身教练','直播','兼职','其他工作'],
   life:['吃饭','通勤','收拾自己'],
   growth:['学习','运动健身','内容创作'],
   leisure:['娱乐','社交','玩游戏']
