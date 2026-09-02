@@ -1820,12 +1820,11 @@ var NoSpend={tab:'home',lt:'buy',form:{emo:'',inten:0,trig:'',res:'hold',exc:fal
 var NS_EMO=['😍心动','😰焦虑','😴无聊','😤压力大','🥺难过','😊开心','🤝社交'];
 var NS_RES=[['hold','🙅 忍住了'],['cool','⏳ 进冷静期'],['buy','🛍️ 买了']];
 var NS_INV_CATS=['服饰','鞋包','美妆护肤','饰品','家居','数码','书籍','运动装备','其他'];
-var NS_COOL=30;
 
 function nsDefault(){
   return {
     set:{
-      start:'',end:'',excPerMonth:2,
+      start:'',end:'',excPerMonth:2,coolDays:30,
       cats:['服饰','美妆护肤','鞋包','饰品','家居装饰','数码','盲盒手办','奶茶甜品','外卖','图书','课程']
     },
     urge:[],   // {id,date,item,amt,emo,inten,trig,res,why,after,exc}
@@ -1853,11 +1852,22 @@ function nsDefault(){
     ]
   };
 }
-function NS(){if(!DB.nospend)DB.nospend=nsDefault();return DB.nospend}
+function NS(){
+  if(!DB.nospend)DB.nospend=nsDefault();
+  var n=DB.nospend;
+  if(n.set&&n.set.coolDays==null)n.set.coolDays=30;
+  if(!n._mig_resDate){
+    (n.urge||[]).forEach(function(u){if(!u.resDate)u.resDate=u.date});
+    n._mig_resDate=true;
+  }
+  return n;
+}
+function nsCoolDays(){return +NS().set.coolDays||30}
 
 /* ---- 统计 ---- */
+function nsRD(u){return u.resDate||u.date}
 function nsStats(dates){
-  var us=(NS().urge||[]).filter(function(u){return !dates||dates.indexOf(u.date)>=0});
+  var us=(NS().urge||[]).filter(function(u){return !dates||dates.indexOf(nsRD(u))>=0});
   var o={urge:us.length,hold:0,cool:0,buy:0,saved:0,spent:0};
   us.forEach(function(u){
     if(u.res==='hold'){o.hold++;o.saved+=+u.amt||0}
@@ -1885,7 +1895,7 @@ function nsStreak(){
   var n=0,d=end,g=0;
   while(g++<3000){
     if(d<s.start)break;
-    var bad=(NS().urge||[]).some(function(u){return u.date===d&&u.res==='buy'});
+    var bad=(NS().urge||[]).some(function(u){return u.res==='buy'&&nsRD(u)===d});
     if(bad)break;
     n++;d=addD(d,-1);
   }
@@ -1893,7 +1903,7 @@ function nsStreak(){
 }
 function nsExcUsed(mk){
   mk=mk||mKey(TODAY());
-  return (NS().urge||[]).filter(function(u){return u.res==='buy'&&u.exc&&mKey(u.date)===mk}).length;
+  return (NS().urge||[]).filter(function(u){return u.res==='buy'&&u.exc&&mKey(nsRD(u))===mk}).length;
 }
 function nsBadges(){
   var a=nsStats(null),s=nsStreak(),inv=(NS().inv||[]).length;
@@ -1956,8 +1966,10 @@ NoSpend.homeHTML=function(){
     '<div class="stat-box"><div class="stat-num green">'+mo.cool+'</div><div class="muted">冷静期（次）</div></div>'+
     '<div class="stat-box"><div class="stat-num red">'+mo.buy+'</div><div class="muted">买了（次）</div></div></div>'+
     '<div class="summary-line mt8"><span>本月少花</span><span class="purple">¥'+fm(mo.saved)+'</span></div>'+
+    '<div class="summary-line"><span>⏳ 正在冷静期</span><span>'+NoSpend.coolList().length+' 件 · ¥'+fm(sum(NoSpend.coolList().map(function(u){return +u.amt||0})))+'</span></div>'+
     '<div class="summary-line"><span>本月例外额度</span><span>已用 '+nsExcUsed()+' / '+(s.excPerMonth||0)+' 次</span></div>'+
-    '<div class="muted mt8">🛡️ 房租、伙食、通勤、工作必需不算破戒，不用记录在这里。</div></div>';
+    '<div class="muted mt8">🛡️ 房租、伙食、通勤、工作必需不算破戒，不用记录在这里。</div>'+
+    (NoSpend.coolList().length?'<button class="btn btn-full mt8" onclick="NoSpend.tab=\'list\';NoSpend.lt=\'cool\';rerender()">⏳ 去处理冷静期 ›</button>':'')+'</div>';
   // 快速记录
   html+='<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addUrge()">⚡ 我现在想买东西…（记一次冲动）</button>';
   // 徽章
@@ -1974,6 +1986,12 @@ NoSpend.homeHTML=function(){
 };
 
 /* ---- 冲动记录 ---- */
+function nsResTxt(r){return r==='hold'?'🙅 忍住':r==='cool'?'⏳ 冷静期':'🛍️ 买了'}
+function nsTraceHTML(u){
+  if(!u.hist||!u.hist.length)return '';
+  var t=u.hist[u.hist.length-1];
+  return '<div class="muted mt8">🔄 '+nsResTxt(t.from)+' → '+nsResTxt(t.to)+' · 第 '+t.days+' 天做的决定</div>';
+}
 NoSpend.urgeHTML=function(){
   var list=(NS().urge||[]).slice().sort(function(a,b){return a.date<b.date?1:-1});
   var mo=nsStats(monthDays(mKey(TODAY())));
@@ -1992,11 +2010,15 @@ NoSpend.urgeHTML=function(){
     html+='<div class="card"><div class="h2">'+dispD(u.date)+' <span class="sub">'+rTxt+'</span></div>'+
       '<div class="row"><b class="grow">'+esc(u.item||'没写是什么')+'</b><b class="'+col+'">¥'+fm(u.amt)+'</b></div>'+
       '<div class="muted mt8">'+(u.emo||'')+' 冲动强度 '+(u.inten||0)+'/5'+(u.trig?' · 触发：'+esc(u.trig):'')+'</div>'+
+      (nsRD(u)!==u.date?'<div class="muted">决定于 '+dispD(nsRD(u))+'</div>':'')+
+      nsTraceHTML(u)+
       (u.why?'<div class="mt8">原因：'+esc(u.why)+'</div>':'')+
       (u.after?'<div class="muted mt8">买后感受：'+esc(u.after)+'</div>':'')+
       (u.exc?'<div class="muted mt8">🎟️ 使用了本月例外额度</div>':'')+
+      (u.srcId?'<div class="muted mt8">📝 来自必买清单，状态已同步</div>':'')+
       '<div class="row mt8">'+
-      (u.res==='buy'?'<button class="btn btn-sm" onclick="NoSpend.addAfter(\''+u.id+'\')">✍️ 补写买后感受</button>':'')+
+      '<button class="btn btn-sm" onclick="NoSpend.changeRes(\''+u.id+'\')">🔄 改结果</button>'+
+      (u.res==='cool'?'<button class="btn btn-sm" onclick="NoSpend.tab=\'list\';NoSpend.lt=\'cool\';rerender()">⏳ 去看倒计时</button>':'')+
       '<button class="btn btn-sm" style="margin-left:auto;color:var(--red)" onclick="NoSpend.del(\'urge\',\''+u.id+'\')">删除</button></div></div>';
   });
   return html;
@@ -2039,12 +2061,12 @@ NoSpend.saveUrge=function(){
   var item=$('#nuItem').value.trim();
   if(!item){toast('先写一下想要什么哦');return}
   var f=NoSpend.form;
-  NS().urge.push({id:uid(),date:TODAY(),item:item,amt:+$('#nuAmt').value||0,emo:f.emo,inten:f.inten,
-    trig:f.trig,res:f.res,why:$('#nuWhy').value.trim(),after:'',exc:!!(f.exc&&f.res==='buy')});
+  NS().urge.push({id:uid(),date:TODAY(),resDate:TODAY(),item:item,amt:+$('#nuAmt').value||0,emo:f.emo,inten:f.inten,
+    trig:f.trig,res:f.res,why:$('#nuWhy').value.trim(),after:'',exc:!!(f.exc&&f.res==='buy'),hist:[]});
   save();closeModal();rerender();
   var amt=+$('#nuAmt').value||0;
   if(f.res==='hold')toast('🙅 忍住了！省下 ¥'+fm(amt)+'，你超棒的');
-  else if(f.res==='cool')toast('⏳ 已加入冷静期，30天后再问问自己');
+  else if(f.res==='cool')toast('⏳ 已进冷静期，'+nsCoolDays()+' 天后再问问自己');
   else toast('🌿 买了也没关系，记下来就好，明天重新开始');
 };
 NoSpend.addAfter=function(id){
@@ -2058,38 +2080,153 @@ NoSpend.saveAfter=function(id){
   var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
   u.after=$('#naTxt').value.trim();save();closeModal();rerender();toast('已记录 🌿');
 };
+NoSpend.changeRes=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  NoSpend.form.res=u.res;NoSpend.form.exc=!!u.exc;
+  var left=Math.max(0,(NS().set.excPerMonth||0)-nsExcUsed());
+  var html='<div class="h2">🔄 改结果</div>'+
+    '<div class="muted" style="margin-bottom:6px">'+esc(u.item||'')+' · ¥'+fm(u.amt)+'</div>'+
+    '<label class="fl">改成什么结果</label><div id="ncRes">';
+  NS_RES.forEach(function(r){
+    html+='<button class="chip'+(u.res===r[0]?' on':'')+'" onclick="NoSpend.pick(\'res\',\''+r[0]+'\',this)">'+r[1]+'</button>';
+  });
+  html+='</div><div id="nuExcBox" style="display:'+(u.res==='buy'?'block':'none')+'"><label class="fl">这次破例</label><div>'+
+    '<button class="chip'+(u.exc?' on':'')+'" id="nuExc" onclick="NoSpend.toggleExc(this)">🎟️ 使用本月例外额度（剩 '+left+' 次）</button></div></div>'+
+    '<label class="fl">做决定的日期</label><input class="input" type="date" id="ncDate" value="'+TODAY()+'">'+
+    '<label class="fl">买后感受 / 当时的想法（选填）</label><textarea class="ta" id="ncAfter">'+esc(u.after||'')+'</textarea>'+
+    '<div class="muted">改完概览、忍住率、徽章、连续天数会自动重算，不用重新记一条。</div>'+
+    '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-p grow" onclick="NoSpend.saveRes(\''+id+'\')">保存</button></div>';
+  modal(html);
+};
+NoSpend.saveRes=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  var nr=NoSpend.form.res,od=$('#ncDate').value||TODAY(),af=$('#ncAfter').value.trim();
+  if(nr!==u.res){
+    if(!u.hist)u.hist=[];
+    u.hist.push({d:od,from:u.res,to:nr,days:Math.max(0,daysDiff(u.date,od))});
+  }
+  u.res=nr;u.resDate=od;u.exc=!!(NoSpend.form.exc&&nr==='buy');
+  if(af)u.after=af;
+  if(u.srcId){
+    var b=(NS().buy||[]).find(function(x){return x.id===u.srcId});
+    if(b)b.status=nr==='buy'?'bought':nr==='hold'?'drop':'cool';
+  }
+  save();closeModal();rerender();
+  if(nr==='hold')toast('🙅 改成忍住了，省下 ¥'+fm(u.amt)+'，你真棒');
+  else if(nr==='cool')toast('⏳ 已转入冷静期，'+nsCoolDays()+' 天后再决定');
+  else toast('🌿 记下来了，不完美的记录也是记录');
+};
 
 /* ---- 清单（必买/禁买/诱惑源） ---- */
 NoSpend.listHTML=function(){
   var lt=NoSpend.lt;
+  var cool=NoSpend.coolList().length;
   var html='<div class="subtabs">'+
-    '<button class="'+(lt==='buy'?'on':'')+'" onclick="NoSpend.lt=\'buy\';rerender()">📝 必买+冷静期</button>'+
-    '<button class="'+(lt==='ban'?'on':'')+'" onclick="NoSpend.lt=\'ban\';rerender()">🚫 禁买红线</button>'+
+    '<button class="'+(lt==='buy'?'on':'')+'" onclick="NoSpend.lt=\'buy\';rerender()">📝 必买</button>'+
+    '<button class="'+(lt==='cool'?'on':'')+'" onclick="NoSpend.lt=\'cool\';rerender()">⏳ 冷静期'+(cool?'('+cool+')':'')+'</button>'+
+    '<button class="'+(lt==='ban'?'on':'')+'" onclick="NoSpend.lt=\'ban\';rerender()">🚫 禁买</button>'+
     '<button class="'+(lt==='trig'?'on':'')+'" onclick="NoSpend.lt=\'trig\';rerender()">🎯 诱惑源</button></div>';
-  return html+(lt==='buy'?NoSpend.buyHTML():lt==='ban'?NoSpend.banHTML():NoSpend.trigHTML());
+  return html+(lt==='buy'?NoSpend.buyHTML():lt==='cool'?NoSpend.coolHTML():lt==='ban'?NoSpend.banHTML():NoSpend.trigHTML());
+};
+NoSpend.coolList=function(){
+  return (NS().urge||[]).filter(function(u){return u.res==='cool'});
+};
+NoSpend.coolHTML=function(){
+  var cd=nsCoolDays();
+  var list=NoSpend.coolList().slice().sort(function(a,b){
+    return (cd-daysDiff(a.date,TODAY()))-(cd-daysDiff(b.date,TODAY()));
+  });
+  var frozen=sum(list.map(function(u){return +u.amt||0}));
+  var html='<div class="muted" style="margin-bottom:8px">在冲动记录里选了「⏳ 冷静期」的，会自动同步到这里，不用重复填。到期再问自己一句：我还想要吗？</div>';
+  html+='<div class="card pinkbg"><div class="h2">⏳ 冷静期暂停中</div>'+
+    '<div class="summary-line"><span>正在冷静</span><span><b>'+list.length+'</b> 件</span></div>'+
+    '<div class="summary-line"><span>冻结金额</span><span class="purple">¥'+fm(frozen)+'</span></div>'+
+    '<div class="summary-line"><span>冷静期长度</span><span>'+cd+' 天</span></div>'+
+    '<div class="muted mt8">还没决定，所以先不算进「少花」。等你放下，这笔钱就真的省下来了。</div></div>';
+  if(!list.length)return html+'<div class="card"><div class="empty">没有在冷静期的东西，很好 🌿</div></div>';
+  list.forEach(function(u){
+    var waited=Math.max(0,daysDiff(u.date,TODAY()));
+    var left=cd-waited,due=left<=0;
+    var pct=Math.min(100,waited/cd*100);
+    html+='<div class="card'+(due?' pinkbg':'')+'"><div class="h2">'+esc(u.item||'没写是什么')+
+      ' <span class="sub">'+(due?'✅ 到期，该决定了':'还剩 '+left+' 天')+'</span></div>'+
+      '<div class="row"><b class="grow purple">¥'+fm(u.amt)+'</b><span class="muted">已等待 '+waited+' / '+cd+' 天</span></div>'+
+      '<div class="prog mt8"><i style="width:'+pct+'%"></i></div>'+
+      (u.trig?'<div class="muted mt8">触发源：'+esc(u.trig)+'</div>':'')+
+      (u.why?'<div class="muted">当初想买的原因：'+esc(u.why)+'</div>':'')+
+      nsTraceHTML(u)+
+      (u.srcId?'<div class="muted mt8">📝 来自必买清单，决定后状态会同步回去</div>':'')+
+      '<div class="row mt8">'+
+      '<button class="btn btn-sm" onclick="NoSpend.coolDone(\''+u.id+'\',\'hold\')">🌿 不要了</button>'+
+      '<button class="btn btn-sm" onclick="NoSpend.coolDone(\''+u.id+'\',\'buy\')">🛍️ 还是买了</button>'+
+      '<button class="btn btn-sm" style="margin-left:auto" onclick="NoSpend.changeRes(\''+u.id+'\')">🔄 改</button>'+
+      '<button class="btn btn-sm" style="color:var(--red)" onclick="NoSpend.coolDel(\''+u.id+'\')">不再跟踪</button></div></div>';
+  });
+  return html;
+};
+NoSpend.coolDone=function(id,res){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  if(!u.hist)u.hist=[];
+  u.hist.push({d:TODAY(),from:'cool',to:res,days:Math.max(0,daysDiff(u.date,TODAY()))});
+  u.res=res;u.resDate=TODAY();
+  if(res==='hold'){
+    if(u.srcId){var b=(NS().buy||[]).find(function(x){return x.id===u.srcId});if(b)b.status='drop'}
+    save();rerender();toast('🌿 放下了，省下 ¥'+fm(u.amt)+'，这笔钱真的留在你手里了');
+  }else{
+    if(u.srcId){var b2=(NS().buy||[]).find(function(x){return x.id===u.srcId});if(b2)b2.status='bought'}
+    save();rerender();
+    modal('<div class="h2">🛍️ 还是买了</div><div class="muted">'+esc(u.item||'')+' · ¥'+fm(u.amt)+'</div>'+
+      '<label class="fl">要用本月例外额度吗</label><div>'+
+      '<button class="chip" id="cdExc" onclick="NoSpend.toggleExc(this)">🎟️ 使用例外额度（剩 '+Math.max(0,(NS().set.excPerMonth||0)-nsExcUsed())+' 次）</button></div>'+
+      '<label class="fl">买后感受（选填）</label><textarea class="ta" id="cdAfter" placeholder="值得吗？现在什么感觉？"></textarea>'+
+      '<div class="row mt12"><button class="btn grow" onclick="closeModal()">以后再说</button>'+
+      '<button class="btn btn-p grow" onclick="NoSpend.coolBuyDone(\''+id+'\')">保存</button></div>');
+    NoSpend.form.exc=false;
+  }
+};
+NoSpend.coolBuyDone=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  u.exc=!!NoSpend.form.exc;
+  var af=$('#cdAfter').value.trim();if(af)u.after=af;
+  save();closeModal();rerender();
+  toast(u.exc?'🎟️ 已用一次例外额度，计划内的不算失败':'🌿 记下来了，明天重新开始');
+};
+NoSpend.coolDel=function(id){
+  var u=(NS().urge||[]).find(function(x){return x.id===id});if(!u)return;
+  if(u.srcId){var b=(NS().buy||[]).find(function(x){return x.id===u.srcId});if(b&&b.status==='cool')b.status='wait'}
+  NS().urge=NS().urge.filter(function(x){return x.id!==id});
+  save();rerender();toast('已移出冷静期跟踪');
 };
 NoSpend.buyHTML=function(){
   var list=NS().buy||[];
-  var html='<div class="muted" style="margin-bottom:8px">想买的东西先躺 '+NS_COOL+' 天。到期再问自己：我还需要它吗？大多数答案会变成"不要了"。</div>'+
+  var html='<div class="muted" style="margin-bottom:8px">这里是「真的需要」的东西，不用冷静，该买就买。如果只是心动，去记一笔冲动、选「⏳ 冷静期」，或者直接点下面的「先放冷静期」。</div>'+
     '<button class="btn btn-p btn-full" style="margin-bottom:12px" onclick="NoSpend.addBuy()">＋ 加入必买清单</button>';
   if(!list.length)return html+'<div class="card"><div class="empty">清单是空的，很好 🌿</div></div>';
   list.forEach(function(b){
-    var waited=daysDiff(b.added,TODAY());
-    var left=NS_COOL-waited;
-    var st=b.status==='bought'?'✅ 已买':b.status==='drop'?'🌿 已放弃':(left>0?'⏳ 冷静期还剩 '+left+' 天':'✅ 冷静期已过');
+    var st=b.status==='bought'?'✅ 已买':b.status==='drop'?'🌿 已放弃':b.status==='cool'?'⏳ 冷静期中':'📝 待买';
+    var overdue=b.deadline&&b.deadline<TODAY()&&b.status==='wait';
     html+='<div class="card"><div class="h2">'+esc(b.item)+' <span class="sub">'+st+'</span></div>'+
       '<div class="muted">理由：'+esc(b.reason||'—')+'</div>'+
       '<div class="summary-line mt8"><span>预算</span><span>¥'+fm(b.budget)+'</span></div>'+
-      '<div class="summary-line"><span>最晚购买日</span><span>'+(b.deadline||'不限')+'</span></div>'+
-      '<div class="muted mt8">已等待 '+waited+' 天</div>'+
-      (b.status==='wait'?'<div class="row mt8">'+
-        '<button class="btn btn-sm" onclick="NoSpend.buyDone(\''+b.id+'\',\'bought\')">买了吧</button>'+
-        '<button class="btn btn-sm" onclick="NoSpend.buyDone(\''+b.id+'\',\'drop\')">不要了</button>'+
+      '<div class="summary-line"><span>最晚购买日</span><span class="'+(overdue?'red':'')+'">'+(b.deadline||'不限')+(overdue?' · 已过期':'')+'</span></div>'+
+      (b.status==='cool'?'<div class="muted mt8">去「⏳ 冷静期」清单里做决定，选了之后这里会自动更新。</div>'+
+        '<button class="btn btn-sm mt8" onclick="NoSpend.tab=\'list\';NoSpend.lt=\'cool\';rerender()">⏳ 去处理 ›</button>':
+        b.status==='wait'?'<div class="row mt8">'+
+        '<button class="btn btn-sm" onclick="NoSpend.buyDone(\''+b.id+'\',\'bought\')">✅ 买好了</button>'+
+        '<button class="btn btn-sm" onclick="NoSpend.toCool(\''+b.id+'\')">⏳ 先放冷静期</button>'+
         '<button class="btn btn-sm" style="margin-left:auto;color:var(--red)" onclick="NoSpend.del(\'buy\',\''+b.id+'\')">删除</button></div>':
         '<button class="btn btn-sm mt8" style="color:var(--red)" onclick="NoSpend.del(\'buy\',\''+b.id+'\')">删除</button>')+
       '</div>';
   });
   return html;
+};
+NoSpend.toCool=function(id){
+  var b=(NS().buy||[]).find(function(x){return x.id===id});if(!b)return;
+  NS().urge.push({id:uid(),date:TODAY(),resDate:TODAY(),item:b.item,amt:+b.budget||0,emo:'',inten:0,
+    trig:'',res:'cool',why:b.reason||'',after:'',exc:false,src:'buy',srcId:id,hist:[]});
+  b.status='cool';
+  save();rerender();toast('⏳ 已放进冷静期，'+nsCoolDays()+' 天后再决定');
 };
 NoSpend.addBuy=function(){
   modal('<div class="h2">📝 加入必买清单</div>'+
@@ -2105,7 +2242,7 @@ NoSpend.saveBuy=function(){
   if(!v){toast('先写下想买什么');return}
   NS().buy.push({id:uid(),item:v,reason:$('#nbWhy').value.trim(),budget:+$('#nbBud').value||0,
     deadline:$('#nbDl').value,added:TODAY(),status:'wait'});
-  save();closeModal();rerender();toast('⏳ 已加入，先躺 '+NS_COOL+' 天');
+  save();closeModal();rerender();toast('📝 已加入必买清单，该买的时候就买');
 };
 NoSpend.buyDone=function(id,st){
   var b=(NS().buy||[]).find(function(x){return x.id===id});if(!b)return;
@@ -2264,6 +2401,7 @@ NoSpend.statHTML=function(){
     '<div class="stat-box"><div class="stat-num red">'+a.buy+'</div><div class="muted">买了（次）</div></div></div>'+
     '<div class="summary-line mt8"><span>忍住率</span><span>'+(a.urge?Math.round(a.rate*100):0)+'%</span></div>'+
     '<div class="summary-line"><span>累计少花 / 花掉</span><span>¥'+fm(a.saved)+' / ¥'+fm(a.spent)+'</span></div>'+
+    '<div class="summary-line"><span>⏳ 正在冷静期</span><span>'+NoSpend.coolList().length+' 件 · ¥'+fm(sum(NoSpend.coolList().map(function(u){return +u.amt||0})))+'</span></div>'+
     '<div class="summary-line"><span>最长连续零破戒</span><span>'+streak+' 天</span></div></div>';
   html+='<div class="card"><div class="h2">📈 忍住率趋势（近6个月，%）</div>'+lineChart(rateItems,{c:'#8FCBB4'})+'</div>';
   html+='<div class="card"><div class="h2">💰 每月少花（近6个月，元）</div>'+barChart(amtItems,{c1:'#B79CE0',showVal:true})+'</div>';
@@ -2298,6 +2436,7 @@ NoSpend.settings=function(){
     '<label class="fl">开始日期</label><input class="input" type="date" id="nsStart" value="'+esc(s.start||'')+'">'+
     '<label class="fl">结束日期（默认一年后）</label><input class="input" type="date" id="nsEnd" value="'+esc(s.end||'')+'">'+
     '<label class="fl">每月例外次数（计划内破例额度）</label><input class="input" type="number" id="nsExc" value="'+(s.excPerMonth||0)+'">'+
+    '<label class="fl">冷静期天数</label><input class="input" type="number" id="nsCool" value="'+nsCoolDays()+'">'+
     '<div class="muted mt8">🛡️ 房租、伙食、通勤、工作必需开销不算破戒，不需要记录。</div>'+
     '<div class="row mt12"><button class="btn grow" onclick="closeModal()">取消</button>'+
     '<button class="btn btn-p grow" onclick="NoSpend.saveSet()">保存</button></div>');
@@ -2307,6 +2446,7 @@ NoSpend.saveSet=function(){
   s.start=$('#nsStart').value;
   s.end=$('#nsEnd').value;
   s.excPerMonth=Math.max(0,+$('#nsExc').value||0);
+  s.coolDays=Math.max(1,+$('#nsCool').value||30);
   if(s.start&&!s.end)s.end=addD(s.start,364);
   save();closeModal();rerender();toast('⚙️ 规则已保存，开始了就别停哦');
 };
